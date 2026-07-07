@@ -70,6 +70,7 @@ Every session should leave the repo better, not just finish the task.
 - Record it where it'll be read: platform/environment issues -> `state/dev_pitfalls.md`; ML lessons -> `state/lessons.md`; process/architecture issues -> fix the skill/persona file directly.
 - Applies across harnesses (Codex/Claude/Gemini) — a fix belongs in the repo, not only a transcript.
 - Keep entries short: the fact and the fix, not a narrated investigation.
+- Before adding an entry anywhere (`state/dev_pitfalls.md`, `state/lessons.md`, persona/skill docs), check if an existing one already covers it. If so, edit that entry in place — correct, tighten, or extend it — instead of appending a new one. Only add a new entry for something genuinely new. These files should stay curated, not just grow.
 
 ## End Of Session
 
