@@ -1141,6 +1141,51 @@ print({output_json!r})
         self.assertEqual(history[0]["items"][0]["raw"]["teamCount"], 250)
         self.assertIn("Review items[].raw directly", history[0]["agent_instruction"])
 
+    def test_scout_competitions_applies_limit_per_group_not_globally(self):
+        # Found via a live dogfood run: with the documented `--groups general
+        # community --limit 20` and page_size 100, "general" alone can fill the
+        # global limit before "community" is ever considered, silently dropping
+        # it from output with no error or truncation signal.
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+args = sys.argv[1:]
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(args) + "\\n")
+group = args[args.index("--group") + 1]
+rows = [
+    {"ref": f"https://www.kaggle.com/competitions/{group}-comp-{i}", "deadline": "2030-01-01T00:00:00", "category": group}
+    for i in range(5)
+]
+print(json.dumps(rows))
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        proc = self.run_cli(
+            "scout-competitions",
+            "--groups",
+            "general",
+            "community",
+            "--limit",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        body = json.loads(proc.stdout)
+        groups_seen = {item["group"] for item in body["items"]}
+        self.assertEqual(groups_seen, {"general", "community"})
+        self.assertEqual(sum(1 for item in body["items"] if item["group"] == "general"), 2)
+        self.assertEqual(sum(1 for item in body["items"] if item["group"] == "community"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

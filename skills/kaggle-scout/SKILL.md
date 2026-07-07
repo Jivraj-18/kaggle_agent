@@ -14,7 +14,7 @@ description: Find, scout, or evaluate new Kaggle competitions to join. Use for r
    ```
 2. Read `agents/orchestrator.md` and `agents/scout.md`.
 3. Read `state/preferences.json`, `state/lessons.md`, `state/competitions.json`, and latest `state/scout_history.json`.
-4. Fetch raw candidates:
+4. Fetch raw candidates. `--limit` applies per group (each requested group returns up to `--limit` items), not to the combined total:
    ```bash
    uv run python -m kaggle_agent.cli scout-competitions --groups general community --limit 20 --json
    ```

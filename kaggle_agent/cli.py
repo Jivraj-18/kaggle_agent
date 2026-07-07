@@ -915,7 +915,11 @@ def scout_competitions(args: argparse.Namespace) -> None:
         raw = json.loads(args.from_file.read())
         group = args.groups[0] if args.groups else "file"
         items.extend(build_scout_item(row, group, idx) for idx, row in enumerate(raw))
+        items = items[: args.limit]
     else:
+        # --limit applies per group, not to the concatenated total: otherwise the
+        # first group alone can fill it before a later group is ever considered,
+        # silently dropping that group from output with no error signal.
         for group in args.groups:
             rows, result = kaggle_list_competitions(group=group, page_size=args.page_size, search=args.search)
             if result.returncode != 0:
@@ -928,9 +932,10 @@ def scout_competitions(args: argparse.Namespace) -> None:
                     }
                 )
                 continue
-            items.extend(build_scout_item(row, group, idx) for idx, row in enumerate(rows))
+            group_items = [build_scout_item(row, group, idx) for idx, row in enumerate(rows)][: args.limit]
+            items.extend(group_items)
 
-    selected = items[: args.limit]
+    selected = items
     snapshot = {
         "scouted_at": utc_now(),
         "groups": args.groups,
