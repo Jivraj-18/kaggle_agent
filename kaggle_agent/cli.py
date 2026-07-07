@@ -610,7 +610,9 @@ def recompute_metrics(args: argparse.Namespace) -> None:
     experiments = read_list("experiments.json")
     runs = read_list("runs.json")
     submissions = read_list("submissions.json")
+    profiles = read_list("profiles.json")
     sessions = read_sessions_jsonl()
+    metric_directions = {row.get("competition_slug"): row.get("metric_direction") for row in profiles}
     competitions: dict[str, dict[str, Any]] = {}
 
     def bucket(slug: str | None) -> dict[str, Any]:
@@ -624,6 +626,7 @@ def recompute_metrics(args: argparse.Namespace) -> None:
                 "submissions": 0,
                 "valid_submissions": 0,
                 "best_public_score": None,
+                "metric_direction": metric_directions.get(key),
                 "families": {},
                 "sessions": 0,
                 "tokens": {"input": 0, "output": 0, "cache_read": 0},
@@ -649,7 +652,11 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         if row.get("valid"):
             data["valid_submissions"] += 1
         score = row.get("public_score")
-        if score is not None and (data["best_public_score"] is None or score > data["best_public_score"]):
+        if score is not None and (
+            data["best_public_score"] is None
+            or (data.get("metric_direction") == "minimize" and score < data["best_public_score"])
+            or (data.get("metric_direction") != "minimize" and score > data["best_public_score"])
+        ):
             data["best_public_score"] = score
 
     for row in sessions:

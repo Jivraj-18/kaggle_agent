@@ -537,6 +537,14 @@ print("Successfully submitted to competition")
 
     def test_metrics_recompute_rolls_up_observability(self):
         self.run_cli(
+            "profiles",
+            "add",
+            "demo-comp",
+            "--metric-direction",
+            "minimize",
+            "--json",
+        )
+        self.run_cli(
             "experiments",
             "add",
             "--competition-slug",
@@ -574,6 +582,19 @@ print("Successfully submitted to competition")
             "0.8",
             "--valid",
         )
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-2",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-2",
+            "--public-score",
+            "0.7",
+            "--valid",
+        )
         start = self.run_cli(
             "sessions",
             "start",
@@ -605,6 +626,7 @@ print("Successfully submitted to competition")
         self.assertEqual(body["competitions"]["demo-comp"]["experiments"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["runs"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["failed_runs"], 1)
+        self.assertEqual(body["competitions"]["demo-comp"]["best_public_score"], 0.7)
         self.assertEqual(body["competitions"]["demo-comp"]["sessions"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["tokens"]["input"], 100)
         self.assertEqual(body["sessions"]["total_input_tokens"], 100)
