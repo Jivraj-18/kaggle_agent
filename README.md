@@ -98,7 +98,7 @@ python -m kaggle_agent.cli experiments add \
   --status planned
 ```
 
-If the same competition, hypothesis, plan file hash, and notebook file hash already exist, the CLI exits with `duplicate experiment`. Use `--allow-duplicate` only when the repeat is intentional and the reason is recorded in `--notes`.
+If the same competition, hypothesis, plan file hash, and notebook file hash already exist, the CLI exits with `duplicate experiment`. A second experiment in the same competition and family must include `--what-changed`. Use `--allow-duplicate` only when the repeat is intentional and the reason is recorded in `--notes`.
 
 Push an approved Kaggle notebook and record the run handoff:
 

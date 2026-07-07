@@ -39,6 +39,8 @@ Required for heavy runs:
 }
 ```
 
+`what_changed` is required when another experiment already exists for the same `competition_slug` and `family`.
+
 Recommended phase values:
 
 ```text

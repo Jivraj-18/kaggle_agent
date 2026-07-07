@@ -688,6 +688,36 @@ print("Successfully submitted to competition")
         self.assertIn("duplicate experiment", second.stderr)
         self.assertIn(first_body["experiment_id"], second.stderr)
 
+    def test_experiment_family_repeat_requires_what_changed(self):
+        first = self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--family",
+            "feature-gbdt",
+            "--what-changed",
+            "Initial feature-gbdt baseline.",
+            "--hypothesis",
+            "GBDT baseline gives a valid score",
+            "--json",
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+
+        repeat = self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--family",
+            "feature-gbdt",
+            "--hypothesis",
+            "GBDT variant improves the baseline",
+            "--json",
+        )
+        self.assertEqual(repeat.returncode, 1)
+        self.assertIn("what_changed required", repeat.stderr)
+
     def test_scout_competitions_from_file(self):
         source = Path(self.tmp.name) / "competitions.json"
         source.write_text(

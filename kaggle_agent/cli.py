@@ -160,14 +160,22 @@ def add_experiment(args: argparse.Namespace) -> None:
         "notes": args.notes or "",
     }
     row["experiment_key"] = args.experiment_key or experiment_key(row)
-    existing = next(
-        (item for item in read_list("experiments.json") if item.get("experiment_key") == row["experiment_key"]),
-        None,
-    )
+    experiments = read_list("experiments.json")
+    existing = next((item for item in experiments if item.get("experiment_key") == row["experiment_key"]), None)
     if existing and not args.allow_duplicate:
         raise SystemExit(
             f"duplicate experiment: {existing.get('experiment_id')} already has key {row['experiment_key']}"
         )
+    family_repeat = next(
+        (
+            item
+            for item in experiments
+            if item.get("competition_slug") == row["competition_slug"] and item.get("family") == row.get("family")
+        ),
+        None,
+    )
+    if family_repeat and row.get("family") and not row.get("what_changed"):
+        raise SystemExit(f"what_changed required for another {row['family']} experiment")
     emit(upsert_by_key("experiments.json", "experiment_id", row), args.json)
 
 
