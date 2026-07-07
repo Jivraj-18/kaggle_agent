@@ -226,6 +226,42 @@ class CliTests(unittest.TestCase):
         runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
         self.assertEqual(runs[0]["next_action"], "human_review_submission")
 
+    def test_review_output_validates_submission_against_sample(self):
+        output_dir = Path(self.tmp.name) / "kaggle-output"
+        output_dir.mkdir()
+        (output_dir / "submission.csv").write_text("id,target\n1,0.5\n2,0.7\n", encoding="utf-8")
+        sample = Path(self.tmp.name) / "sample_submission.csv"
+        sample.write_text("id,target\n1,0\n2,0\n", encoding="utf-8")
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "1",
+            "--status",
+            "COMPLETE",
+        )
+        self.run_cli("runs", "pull-output", "user/demo-kernel:v1", "--from-dir", str(output_dir), "--json")
+
+        reviewed = self.run_cli(
+            "runs",
+            "review-output",
+            "user/demo-kernel:v1",
+            "--sample-submission",
+            str(sample),
+            "--json",
+        )
+        self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+        review = json.loads(reviewed.stdout)
+        self.assertEqual(review["verdict"], "submission_candidate")
+        self.assertIn("submission_columns_match_sample", review["passed_checks"])
+        self.assertIn("submission_row_count_match_sample", review["passed_checks"])
+
     def test_metrics_recompute_rolls_up_observability(self):
         self.run_cli(
             "experiments",

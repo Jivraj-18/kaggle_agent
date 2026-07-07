@@ -111,7 +111,9 @@ Pull outputs/logs for a terminal run:
 
 ```bash
 python -m kaggle_agent.cli runs pull-output jivrajsingh/22f3002542-notebook-2026t2:v3 --json
-python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-2026t2:v3 --json
+python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-2026t2:v3 \
+  --sample-submission path/to/sample_submission.csv \
+  --json
 ```
 
 Record a submission:

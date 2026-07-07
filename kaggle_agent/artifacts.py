@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 from typing import Any
 
@@ -70,13 +71,24 @@ def find_output_artifact(run_id: str) -> dict[str, Any] | None:
     return matches[-1] if matches else None
 
 
-def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any]) -> dict[str, Any]:
+def csv_shape(path: Path) -> dict[str, Any]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        rows = list(reader)
+    return {
+        "columns": rows[0] if rows else [],
+        "row_count": max(len(rows) - 1, 0),
+    }
+
+
+def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any], sample_submission: Path | None = None) -> dict[str, Any]:
     files = artifact.get("files") or []
     by_name = {row.get("name"): row for row in files}
     passed_checks: list[str] = []
     failed_checks: list[str] = []
 
     submission = by_name.get("submission.csv")
+    submission_path = Path(artifact["local_path"]) / "submission.csv"
     if submission:
         passed_checks.append("submission_csv_present")
         if submission.get("size", 0) > 0:
@@ -85,6 +97,18 @@ def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any]) -> dic
             failed_checks.append("submission_csv_nonempty")
     else:
         failed_checks.append("submission_csv_present")
+
+    if submission and sample_submission:
+        actual = csv_shape(submission_path)
+        expected = csv_shape(sample_submission)
+        if actual["columns"] == expected["columns"]:
+            passed_checks.append("submission_columns_match_sample")
+        else:
+            failed_checks.append("submission_columns_match_sample")
+        if actual["row_count"] == expected["row_count"]:
+            passed_checks.append("submission_row_count_match_sample")
+        else:
+            failed_checks.append("submission_row_count_match_sample")
 
     verdict = "submission_candidate" if not failed_checks else "invalid_output"
     next_action = "human_review_submission" if verdict == "submission_candidate" else "triage_output"

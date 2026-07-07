@@ -216,7 +216,7 @@ def review_run_output(args: argparse.Namespace) -> None:
     artifact = find_output_artifact(args.run_id)
     if not artifact:
         raise SystemExit(f"output artifact not found for run: {args.run_id}")
-    emit(review_output_artifact(run, artifact), args.json)
+    emit(review_output_artifact(run, artifact, args.sample_submission), args.json)
 
 
 def add_submission(args: argparse.Namespace) -> None:
@@ -637,6 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_pull.set_defaults(func=pull_run_output)
     run_review = runs_sub.add_parser("review-output")
     run_review.add_argument("run_id")
+    run_review.add_argument("--sample-submission", type=Path)
     run_review.add_argument("--json", action="store_true")
     run_review.set_defaults(func=review_run_output)
 
