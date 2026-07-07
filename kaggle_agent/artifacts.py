@@ -131,4 +131,16 @@ def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any], sample
             break
     write_json("artifacts.json", rows)
     update_matching("runs.json", lambda row: row.get("run_id") == run["run_id"], {"next_action": next_action})
+    upsert_by_key(
+        "tasks.json",
+        "task_id",
+        {
+            "task_id": f"{run['run_id']}-{next_action}",
+            "competition_slug": run.get("competition_slug"),
+            "kind": next_action,
+            "priority": "high" if next_action == "human_review_submission" else "normal",
+            "status": "open",
+            "notes": f"Review output artifact {artifact['artifact_id']}",
+        },
+    )
     return review

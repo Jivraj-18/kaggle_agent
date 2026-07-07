@@ -319,6 +319,9 @@ class CliTests(unittest.TestCase):
         self.assertEqual(artifacts[0]["review"]["verdict"], "submission_candidate")
         runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
         self.assertEqual(runs[0]["next_action"], "human_review_submission")
+        tasks = json.loads((Path(self.tmp.name) / "tasks.json").read_text(encoding="utf-8"))
+        self.assertEqual(tasks[0]["kind"], "human_review_submission")
+        self.assertEqual(tasks[0]["status"], "open")
 
     def test_review_output_validates_submission_against_sample(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"

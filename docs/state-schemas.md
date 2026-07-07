@@ -158,6 +158,8 @@ Use tasks for explicit cross-session handoff:
 
 Use `tasks add/list/complete`.
 
+`runs review-output` also creates a task automatically, such as `human_review_submission` or `triage_output`, so future sessions can resume from explicit next actions.
+
 Kaggle outputs and pulled logs are recorded here:
 
 ```json
