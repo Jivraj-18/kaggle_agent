@@ -15,6 +15,9 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 ## Main commands to build
 
 - `kaggle-agent state-summary`: summarize local state.
+- `kaggle-agent resume-context`: first command for future coding-agent sessions.
+- `kaggle-agent sessions start/end/list`: record session observability and token/cost metadata.
+- `kaggle-agent metrics recompute`: regenerate observability roll-ups.
 - `kaggle-agent validate-state`: validate state file shapes.
 - `kaggle-agent competitions add/list`: record competitions under consideration or joined.
 - `kaggle-agent runs add/list/check`: record Kaggle notebook runs and check one run on demand.
@@ -37,6 +40,8 @@ Future commands:
 - Archive durable state/data/artifacts in Google Drive when they need to survive beyond this machine. See [docs/google-drive.md](docs/google-drive.md).
 - Record why each experiment was attempted, not only the score.
 - Keep deterministic code limited to fetching, validation, indexing, and persistence. Competition selection is a coding-agent decision.
+- Track `experiment_key` across experiments, runs, and submissions so score changes remain attributable to hypotheses.
+- Record session observability in `state/observability/sessions.jsonl`.
 
 ## CLI examples
 
@@ -44,6 +49,17 @@ Initialize local state files:
 
 ```bash
 python -m kaggle_agent.cli init-state
+```
+
+Start a coding-agent session:
+
+```bash
+python -m kaggle_agent.cli sessions start \
+  --harness codex \
+  --model gpt-5 \
+  --skill kaggle-next-experiment \
+  --json
+python -m kaggle_agent.cli resume-context --json
 ```
 
 Record a competition:
@@ -60,6 +76,7 @@ Record a Kaggle notebook run:
 ```bash
 python -m kaggle_agent.cli runs add \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --experiment-key <experiment-key> \
   --kernel-slug jivrajsingh/22f3002542-notebook-2026t2 \
   --version 3 \
   --status COMPLETE \
@@ -73,6 +90,9 @@ Record a heavy experiment before pushing a notebook:
 ```bash
 python -m kaggle_agent.cli experiments add \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --phase feature_engineering \
+  --family feature-gbdt \
+  --what-changed "Adds grouped target-safe aggregate features over baseline." \
   --hypothesis "LightGBM with log target and grouped validation improves RMSLE" \
   --plan-file competitions/heavy-equipment/plans/exp001.md \
   --notebook-file competitions/heavy-equipment/notebooks/exp001.py \
@@ -93,6 +113,7 @@ Record a submission:
 python -m kaggle_agent.cli submissions add \
   --ref 54414716 \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --experiment-key <experiment-key> \
   --kernel-slug jivrajsingh/22f3002542-notebook-2026t2 \
   --version 3 \
   --public-score 0.21106 \
@@ -128,4 +149,10 @@ Push changed local state files to Google Drive:
 
 ```bash
 python -m kaggle_agent.cli drive-sync push --json
+```
+
+Recompute observability roll-ups:
+
+```bash
+python -m kaggle_agent.cli metrics recompute --json
 ```

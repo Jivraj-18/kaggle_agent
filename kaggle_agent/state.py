@@ -19,6 +19,14 @@ def write_json(name: str, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def append_jsonl(name: str, value: dict[str, Any]) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    path = STATE_DIR / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, sort_keys=True) + "\n")
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -120,3 +128,8 @@ def ensure_state_files() -> None:
     lessons = STATE_DIR / "lessons.md"
     if not lessons.exists():
         lessons.write_text("# Lessons\n\n", encoding="utf-8")
+    observability = STATE_DIR / "observability"
+    observability.mkdir(parents=True, exist_ok=True)
+    metrics = observability / "metrics.json"
+    if not metrics.exists():
+        metrics.write_text("{}\n", encoding="utf-8")

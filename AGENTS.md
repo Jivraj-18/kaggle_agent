@@ -7,6 +7,7 @@ This repo is for coding agents operating Kaggle work across sessions.
 Start every future session with:
 
 ```bash
+python -m kaggle_agent.cli sessions start --harness <codex|claude|gemini|other> --model <model> --skill <skill-name> --json
 python -m kaggle_agent.cli resume-context --json
 ```
 
@@ -15,9 +16,9 @@ Then choose the workflow from the user's English request.
 ## User Request Routing
 
 - "Check what happened", "look at updates", "is the submission good or bad" -> use `skills/kaggle-check-updates/SKILL.md`.
-- "Find new competitions", "scout Kaggle", "what should we join" -> use `skills/kaggle-scout-new-competitions/SKILL.md`.
-- "Plan next experiment", "improve score", "what should we try" -> use `skills/autokaggle-orchestrator/SKILL.md` and `skills/kaggle-experiment-ledger/SKILL.md`.
-- "Review before pushing/submitting" -> use `skills/autokaggle-reviewer-loop/SKILL.md`.
+- "Find new competitions", "scout Kaggle", "what should we join" -> use `skills/kaggle-scout/SKILL.md`.
+- "Plan next experiment", "improve score", "what should we try" -> use `skills/kaggle-next-experiment/SKILL.md`.
+- "Review before pushing/submitting" -> read `agents/reviewer.md`.
 
 ## Source Of Truth
 
@@ -31,6 +32,7 @@ JSON state is canonical in v0:
 - `state/notebooks.json`
 - `state/artifacts.json`
 - `state/lessons.md`
+- `state/observability/sessions.jsonl`
 
 Do not commit `state/`.
 
@@ -44,7 +46,7 @@ Notebook files should not be committed to this repo. Track notebook identity and
 
 ## Architecture
 
-Follow AutoKaggle's roles and phases, adapted for Kaggle remote compute:
+Personas live in `agents/`. Follow AutoKaggle's roles and phases, adapted for Kaggle remote compute:
 
 - Reader: understands competition rules, metric, data, constraints.
 - Planner: picks phase, hypothesis, validation, stop condition.
@@ -53,3 +55,21 @@ Follow AutoKaggle's roles and phases, adapted for Kaggle remote compute:
 - Summarizer: records durable lessons.
 
 Kaggle runs are expensive. Register experiments before push and check pending work before planning new work.
+
+## End Of Session
+
+Before finishing, append observability:
+
+```bash
+python -m kaggle_agent.cli sessions end <session-id> \
+  --outcome "<what changed>" \
+  --personas orchestrator reviewer summarizer \
+  --state-writes runs.json lessons.md \
+  --tokens-input <n> \
+  --tokens-output <n> \
+  --tokens-cache-read <n> \
+  --token-source self-report \
+  --json
+```
+
+If exact token counts are unavailable, use the best available harness-reported value and set `--token-source`.

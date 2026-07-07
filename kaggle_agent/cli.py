@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import PROJECT_ROOT
+from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
 from .kaggle_cli import kernel_status, list_competitions as kaggle_list_competitions
 from .scout import build_scout_item
 from .state import (
+    append_jsonl,
     ensure_state_files,
     read_json,
     read_list,
@@ -60,9 +61,11 @@ def add_run(args: argparse.Namespace) -> None:
     row = {
         "run_id": args.run_id or f"{args.kernel_slug}:v{args.version or 'latest'}",
         "competition_slug": args.competition_slug,
+        "experiment_key": args.experiment_key,
         "kernel_slug": args.kernel_slug,
         "version": args.version,
         "status": args.status,
+        "failure_class": args.failure_class,
         "outputs_pulled": args.outputs_pulled,
         "submitted": args.submitted,
         "next_action": args.next_action,
@@ -98,6 +101,8 @@ def add_experiment(args: argparse.Namespace) -> None:
         "experiment_id": args.experiment_id or f"{args.competition_slug}-{utc_now().replace(':', '').replace('-', '')}",
         "competition_slug": args.competition_slug,
         "phase": args.phase,
+        "family": args.family,
+        "what_changed": args.what_changed,
         "hypothesis": args.hypothesis,
         "plan_file": str(args.plan_file) if args.plan_file else None,
         "notebook_file": str(args.notebook_file) if args.notebook_file else None,
@@ -105,6 +110,10 @@ def add_experiment(args: argparse.Namespace) -> None:
         "notebook_sha256": file_sha256(args.notebook_file),
         "status": args.status,
         "run_id": args.run_id,
+        "cv_score": args.cv_score,
+        "cv_baseline": args.cv_baseline,
+        "lb_score": args.lb_score,
+        "outcome": args.outcome,
         "notes": args.notes or "",
     }
     row["experiment_key"] = args.experiment_key or experiment_key(row)
@@ -166,12 +175,17 @@ def add_submission(args: argparse.Namespace) -> None:
     row = {
         "submission_ref": args.ref,
         "competition_slug": args.competition_slug,
+        "experiment_key": args.experiment_key,
         "kernel_slug": args.kernel_slug,
         "version": args.version,
         "file_name": args.file_name,
         "status": args.status,
+        "cv_score": args.cv_score,
         "public_score": args.public_score,
         "private_score": args.private_score,
+        "rank": args.rank,
+        "percentile": args.percentile,
+        "valid": args.valid,
         "notes": args.notes or "",
     }
     emit(upsert_by_key("submissions.json", "submission_ref", row), args.json)
@@ -230,6 +244,8 @@ def resume_context(args: argparse.Namespace) -> None:
             "state/notebooks.json",
             "state/artifacts.json",
             "state/lessons.md",
+            "state/observability/sessions.jsonl",
+            "state/observability/metrics.json",
         ],
         "pending_runs": pending_runs,
         "pending_experiments": pending_experiments,
@@ -239,6 +255,123 @@ def resume_context(args: argparse.Namespace) -> None:
         ),
     }
     emit(context, args.json)
+
+
+def start_session(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    now = utc_now()
+    safe_time = now.replace(":", "").replace("-", "")
+    session_id = args.session_id or f"{safe_time}-{args.harness}"
+    record = {
+        "session_id": session_id,
+        "harness": args.harness,
+        "model": args.model,
+        "skill_invoked": args.skill,
+        "competition_slug": args.competition_slug,
+        "started_at": now,
+    }
+    write_json("observability/current_session.json", record)
+    emit(record, args.json)
+
+
+def end_session(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    current = read_json("observability/current_session.json", {})
+    if current and current.get("session_id") != args.session_id:
+        raise SystemExit(f"active session mismatch: {current.get('session_id')} != {args.session_id}")
+    record = {
+        **current,
+        "session_id": args.session_id,
+        "ended_at": utc_now(),
+        "personas_used": args.personas or [],
+        "state_writes": args.state_writes or [],
+        "outcome": args.outcome,
+        "human_interventions": args.human_interventions,
+        "tokens": {
+            "input": args.tokens_input,
+            "output": args.tokens_output,
+            "cache_read": args.tokens_cache_read,
+            "source": args.token_source,
+        },
+        "estimated_cost_usd": args.estimated_cost_usd,
+    }
+    append_jsonl("observability/sessions.jsonl", record)
+    emit(record, args.json)
+
+
+def list_sessions(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    path = STATE_DIR / "observability" / "sessions.jsonl"
+    rows: list[dict[str, Any]] = []
+    if path.exists():
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    emit(rows, args.json)
+
+
+def read_sessions_jsonl() -> list[dict[str, Any]]:
+    path = STATE_DIR / "observability" / "sessions.jsonl"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def recompute_metrics(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    experiments = read_list("experiments.json")
+    runs = read_list("runs.json")
+    submissions = read_list("submissions.json")
+    sessions = read_sessions_jsonl()
+    competitions: dict[str, dict[str, Any]] = {}
+
+    def bucket(slug: str | None) -> dict[str, Any]:
+        key = slug or "unknown"
+        return competitions.setdefault(
+            key,
+            {
+                "experiments": 0,
+                "runs": 0,
+                "failed_runs": 0,
+                "submissions": 0,
+                "valid_submissions": 0,
+                "best_public_score": None,
+                "families": {},
+            },
+        )
+
+    for row in experiments:
+        data = bucket(row.get("competition_slug"))
+        data["experiments"] += 1
+        family = row.get("family") or "unknown"
+        data["families"][family] = data["families"].get(family, 0) + 1
+
+    for row in runs:
+        data = bucket(row.get("competition_slug"))
+        data["runs"] += 1
+        if str(row.get("status", "")).upper() in {"ERROR", "FAILED", "CANCELED", "CANCELLED"}:
+            data["failed_runs"] += 1
+
+    for row in submissions:
+        data = bucket(row.get("competition_slug"))
+        data["submissions"] += 1
+        if row.get("valid"):
+            data["valid_submissions"] += 1
+        score = row.get("public_score")
+        if score is not None and (data["best_public_score"] is None or score > data["best_public_score"]):
+            data["best_public_score"] = score
+
+    metrics = {
+        "generated_at": utc_now(),
+        "competitions": competitions,
+        "sessions": {
+            "count": len(sessions),
+            "total_input_tokens": sum((row.get("tokens") or {}).get("input") or 0 for row in sessions),
+            "total_output_tokens": sum((row.get("tokens") or {}).get("output") or 0 for row in sessions),
+            "total_cache_read_tokens": sum((row.get("tokens") or {}).get("cache_read") or 0 for row in sessions),
+            "estimated_cost_usd": sum(row.get("estimated_cost_usd") or 0 for row in sessions),
+        },
+    }
+    write_json("observability/metrics.json", metrics)
+    emit(metrics, args.json)
 
 
 def validate(args: argparse.Namespace) -> None:
@@ -319,6 +452,39 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("--json", action="store_true")
     resume.set_defaults(func=resume_context)
 
+    sessions = sub.add_parser("sessions")
+    sessions_sub = sessions.add_subparsers(dest="session_command", required=True)
+    sess_start = sessions_sub.add_parser("start")
+    sess_start.add_argument("--session-id")
+    sess_start.add_argument("--harness", required=True)
+    sess_start.add_argument("--model")
+    sess_start.add_argument("--skill")
+    sess_start.add_argument("--competition-slug")
+    sess_start.add_argument("--json", action="store_true")
+    sess_start.set_defaults(func=start_session)
+    sess_end = sessions_sub.add_parser("end")
+    sess_end.add_argument("session_id")
+    sess_end.add_argument("--outcome", required=True)
+    sess_end.add_argument("--personas", nargs="+")
+    sess_end.add_argument("--state-writes", nargs="+")
+    sess_end.add_argument("--tokens-input", type=int)
+    sess_end.add_argument("--tokens-output", type=int)
+    sess_end.add_argument("--tokens-cache-read", type=int)
+    sess_end.add_argument("--token-source")
+    sess_end.add_argument("--estimated-cost-usd", type=float)
+    sess_end.add_argument("--human-interventions", type=int, default=0)
+    sess_end.add_argument("--json", action="store_true")
+    sess_end.set_defaults(func=end_session)
+    sess_list = sessions_sub.add_parser("list")
+    sess_list.add_argument("--json", action="store_true")
+    sess_list.set_defaults(func=list_sessions)
+
+    metrics = sub.add_parser("metrics")
+    metrics_sub = metrics.add_subparsers(dest="metrics_command", required=True)
+    metrics_recompute = metrics_sub.add_parser("recompute")
+    metrics_recompute.add_argument("--json", action="store_true")
+    metrics_recompute.set_defaults(func=recompute_metrics)
+
     valid = sub.add_parser("validate-state")
     valid.add_argument("--json", action="store_true")
     valid.set_defaults(func=validate)
@@ -367,12 +533,18 @@ def build_parser() -> argparse.ArgumentParser:
     exp_add.add_argument("--experiment-id")
     exp_add.add_argument("--competition-slug", required=True)
     exp_add.add_argument("--phase", default="model_building_validation_prediction")
+    exp_add.add_argument("--family")
+    exp_add.add_argument("--what-changed")
     exp_add.add_argument("--hypothesis", required=True)
     exp_add.add_argument("--plan-file", type=Path)
     exp_add.add_argument("--notebook-file", type=Path)
     exp_add.add_argument("--experiment-key")
     exp_add.add_argument("--status", default="planned")
     exp_add.add_argument("--run-id")
+    exp_add.add_argument("--cv-score", type=float)
+    exp_add.add_argument("--cv-baseline", type=float)
+    exp_add.add_argument("--lb-score", type=float)
+    exp_add.add_argument("--outcome")
     exp_add.add_argument("--notes")
     exp_add.add_argument("--allow-duplicate", action="store_true")
     exp_add.add_argument("--json", action="store_true")
@@ -388,9 +560,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_add = runs_sub.add_parser("add")
     run_add.add_argument("--run-id")
     run_add.add_argument("--competition-slug", required=True)
+    run_add.add_argument("--experiment-key")
     run_add.add_argument("--kernel-slug", required=True)
     run_add.add_argument("--version", type=int)
     run_add.add_argument("--status", default="pushed")
+    run_add.add_argument("--failure-class")
     run_add.add_argument("--outputs-pulled", action="store_true")
     run_add.add_argument("--submitted", action="store_true")
     run_add.add_argument("--next-action", default="check_status")
@@ -412,12 +586,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub_add = submissions_sub.add_parser("add")
     sub_add.add_argument("--ref", required=True)
     sub_add.add_argument("--competition-slug", required=True)
+    sub_add.add_argument("--experiment-key")
     sub_add.add_argument("--kernel-slug")
     sub_add.add_argument("--version", type=int)
     sub_add.add_argument("--file-name", default="submission.csv")
     sub_add.add_argument("--status", default="COMPLETE")
+    sub_add.add_argument("--cv-score", type=float)
     sub_add.add_argument("--public-score", type=float)
     sub_add.add_argument("--private-score", type=float)
+    sub_add.add_argument("--rank", type=int)
+    sub_add.add_argument("--percentile", type=float)
+    sub_add.add_argument("--valid", action="store_true")
     sub_add.add_argument("--notes")
     sub_add.add_argument("--json", action="store_true")
     sub_add.set_defaults(func=add_submission)

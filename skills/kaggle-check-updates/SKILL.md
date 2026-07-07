@@ -15,8 +15,9 @@ Use this skill for user requests like:
 
 ## Workflow
 
-1. Start with:
+1. Start an observable session, then load context:
    ```bash
+   python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill kaggle-check-updates --json
    python -m kaggle_agent.cli resume-context --json
    ```
 2. Read pending runs from `state/runs.json`.
@@ -25,7 +26,7 @@ Use this skill for user requests like:
    python -m kaggle_agent.cli runs check <run-id> --json
    ```
 4. If terminal, pull Kaggle outputs/logs with Kaggle CLI and record artifacts in JSON state.
-5. Use `skills/autokaggle-reviewer-loop/SKILL.md` to evaluate:
+5. Read `agents/reviewer.md`, `agents/triage.md`, and `agents/summarizer.md` to evaluate:
    - runtime success/failure;
    - `submission.csv` validity;
    - CV/public score movement;
@@ -35,5 +36,6 @@ Use this skill for user requests like:
    ```bash
    python -m kaggle_agent.cli drive-sync push --root state --json
    ```
+7. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not continuously poll. Check once per user-triggered session unless the user explicitly asks otherwise.

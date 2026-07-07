@@ -74,6 +74,8 @@ The default stance is no repeated heavy experiment unless the agent can explain 
 
 ## Roles
 
+Persona files live in `agents/`.
+
 - Reader: builds competition/profile context from rules, metric, files, data shape, and constraints.
 - Planner: chooses the AutoKaggle phase, hypothesis, validation plan, and stop condition.
 - Developer: writes notebook code or notebook diffs for exactly the approved plan.
@@ -114,6 +116,27 @@ submission_review
 ```
 
 This keeps AutoKaggle's phase decomposition while preserving JSON as the agent-facing state.
+
+## Observability
+
+Each coding-agent session should be recorded:
+
+```bash
+python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill <skill> --json
+python -m kaggle_agent.cli sessions end <session-id> --outcome "<summary>" --tokens-input <n> --tokens-output <n> --json
+```
+
+Use `experiment_key` to join:
+
+- `experiments.json`
+- `runs.json`
+- `submissions.json`
+
+Regenerate roll-ups with:
+
+```bash
+python -m kaggle_agent.cli metrics recompute --json
+```
 
 ## State Machine
 

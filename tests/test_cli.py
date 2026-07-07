@@ -44,6 +44,63 @@ class CliTests(unittest.TestCase):
         self.assertEqual(body["pending_runs"][0]["kernel_slug"], "u/k")
         self.assertIn("state_files", body)
         self.assertIn("state/runs.json", body["state_files"])
+        self.assertIn("state/observability/sessions.jsonl", body["state_files"])
+
+    def test_session_start_end_writes_observability_jsonl(self):
+        start = self.run_cli(
+            "sessions",
+            "start",
+            "--harness",
+            "codex",
+            "--model",
+            "gpt-5",
+            "--skill",
+            "kaggle-check-updates",
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+        )
+        self.assertEqual(start.returncode, 0, start.stderr)
+        session = json.loads(start.stdout)
+        self.assertIn("session_id", session)
+
+        end = self.run_cli(
+            "sessions",
+            "end",
+            session["session_id"],
+            "--outcome",
+            "checked_pending_runs",
+            "--personas",
+            "reviewer",
+            "summarizer",
+            "--state-writes",
+            "runs.json",
+            "lessons.md",
+            "--tokens-input",
+            "1000",
+            "--tokens-output",
+            "200",
+            "--tokens-cache-read",
+            "300",
+            "--token-source",
+            "self-report",
+            "--estimated-cost-usd",
+            "0.12",
+            "--human-interventions",
+            "1",
+            "--json",
+        )
+        self.assertEqual(end.returncode, 0, end.stderr)
+        record = json.loads(end.stdout)
+        self.assertEqual(record["session_id"], session["session_id"])
+        self.assertEqual(record["outcome"], "checked_pending_runs")
+        self.assertEqual(record["tokens"]["input"], 1000)
+        self.assertEqual(record["personas_used"], ["reviewer", "summarizer"])
+
+        jsonl = Path(self.tmp.name) / "observability" / "sessions.jsonl"
+        lines = jsonl.read_text(encoding="utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(json.loads(lines[0])["estimated_cost_usd"], 0.12)
 
     def test_add_and_list_competition(self):
         add = self.run_cli("competitions", "add", "demo-comp", "--title", "Demo", "--decision", "join")
@@ -59,6 +116,8 @@ class CliTests(unittest.TestCase):
             "add",
             "--competition-slug",
             "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
             "--kernel-slug",
             "user/demo-kernel",
             "--version",
@@ -69,7 +128,97 @@ class CliTests(unittest.TestCase):
         self.assertEqual(add.returncode, 0, add.stderr)
         listing = self.run_cli("runs", "list", "--pending")
         self.assertEqual(listing.returncode, 0, listing.stderr)
+        self.assertIn('"experiment_key": "exp-key-1"', listing.stdout)
         self.assertIn('"kernel_slug": "user/demo-kernel"', listing.stdout)
+
+    def test_submission_records_experiment_lineage(self):
+        add = self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--public-score",
+            "0.8",
+            "--cv-score",
+            "0.75",
+            "--rank",
+            "100",
+            "--percentile",
+            "0.9",
+            "--valid",
+            "--json",
+        )
+        self.assertEqual(add.returncode, 0, add.stderr)
+        body = json.loads(add.stdout)
+        self.assertEqual(body["experiment_key"], "exp-key-1")
+        self.assertEqual(body["cv_score"], 0.75)
+        self.assertTrue(body["valid"])
+
+    def test_metrics_recompute_rolls_up_observability(self):
+        self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--family",
+            "gbdt-baseline",
+            "--hypothesis",
+            "baseline improves score",
+            "--json",
+        )
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "u/k",
+            "--status",
+            "ERROR",
+            "--failure-class",
+            "code",
+        )
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--public-score",
+            "0.8",
+            "--valid",
+        )
+        start = self.run_cli("sessions", "start", "--harness", "codex", "--skill", "kaggle-next-experiment", "--json")
+        session_id = json.loads(start.stdout)["session_id"]
+        self.run_cli(
+            "sessions",
+            "end",
+            session_id,
+            "--outcome",
+            "planned",
+            "--tokens-input",
+            "100",
+            "--tokens-output",
+            "25",
+            "--json",
+        )
+
+        metrics = self.run_cli("metrics", "recompute", "--json")
+        self.assertEqual(metrics.returncode, 0, metrics.stderr)
+        body = json.loads(metrics.stdout)
+        self.assertEqual(body["competitions"]["demo-comp"]["experiments"], 1)
+        self.assertEqual(body["competitions"]["demo-comp"]["runs"], 1)
+        self.assertEqual(body["competitions"]["demo-comp"]["failed_runs"], 1)
+        self.assertEqual(body["sessions"]["total_input_tokens"], 100)
 
     def test_experiment_duplicate_is_blocked(self):
         plan = Path(self.tmp.name) / "plan.md"
@@ -84,6 +233,10 @@ class CliTests(unittest.TestCase):
             "demo-comp",
             "--phase",
             "feature_engineering",
+            "--family",
+            "feature-gbdt",
+            "--what-changed",
+            "Adds grouped fold feature interactions over baseline.",
             "--hypothesis",
             "CatBoost with grouped folds improves CV",
             "--plan-file",
@@ -98,6 +251,8 @@ class CliTests(unittest.TestCase):
         first_body = json.loads(first.stdout)
         self.assertEqual(first_body["competition_slug"], "demo-comp")
         self.assertEqual(first_body["phase"], "feature_engineering")
+        self.assertEqual(first_body["family"], "feature-gbdt")
+        self.assertIn("what_changed", first_body)
         self.assertIn("experiment_key", first_body)
 
         second = self.run_cli(
