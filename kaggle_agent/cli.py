@@ -186,6 +186,8 @@ def list_experiments(args: argparse.Namespace) -> None:
         rows = [row for row in rows if row.get("competition_slug") == args.competition_slug]
     if args.status:
         rows = [row for row in rows if row.get("status") == args.status]
+    if args.family:
+        rows = [row for row in rows if row.get("family") == args.family]
     emit(rows, args.json)
 
 
@@ -908,6 +910,7 @@ def build_parser() -> argparse.ArgumentParser:
     exp_list = experiments_sub.add_parser("list")
     exp_list.add_argument("--competition-slug")
     exp_list.add_argument("--status")
+    exp_list.add_argument("--family")
     exp_list.add_argument("--json", action="store_true")
     exp_list.set_defaults(func=list_experiments)
 

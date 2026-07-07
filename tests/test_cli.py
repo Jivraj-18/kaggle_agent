@@ -718,6 +718,12 @@ print("Successfully submitted to competition")
         self.assertEqual(repeat.returncode, 1)
         self.assertIn("what_changed required", repeat.stderr)
 
+        listing = self.run_cli("experiments", "list", "--competition-slug", "demo-comp", "--family", "feature-gbdt", "--json")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        rows = json.loads(listing.stdout)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["family"], "feature-gbdt")
+
     def test_scout_competitions_from_file(self):
         source = Path(self.tmp.name) / "competitions.json"
         source.write_text(
