@@ -21,19 +21,14 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent validate-state`: validate state file shapes.
 - `kaggle-agent competitions add/list`: record competitions under consideration or joined.
 - `kaggle-agent profiles add/list`: record Reader-extracted competition facts.
-- `kaggle-agent notebooks add/list`: record notebook references without committing notebook files.
+- `kaggle-agent notebooks add/list/push`: record notebook references without committing notebook files, and push approved notebooks to Kaggle.
 - `kaggle-agent notebooks validate-metadata`: check Kaggle metadata before push.
 - `kaggle-agent tasks add/list/complete`: record cross-session next actions.
-- `kaggle-agent runs add/list/check`: record Kaggle notebook runs and check one run on demand.
+- `kaggle-agent runs add/list/check/pull-output/review-output`: record Kaggle notebook runs, check one run on demand, and review outputs.
 - `kaggle-agent submissions add/list`: record submitted files and scores.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.
 - `kaggle-agent experiments add/list`: record planned heavy experiments before notebook push and block exact repeats.
 - `kaggle-agent drive-sync push`: copy changed local state/data files to Google Drive without deleting history.
-
-Future commands:
-
-- `pull-output`: download output/logs for a completed notebook.
-- `plan-next`: use local history to propose the next experiment.
 
 ## Design rules
 
@@ -104,6 +99,18 @@ python -m kaggle_agent.cli experiments add \
 ```
 
 If the same competition, hypothesis, plan file hash, and notebook file hash already exist, the CLI exits with `duplicate experiment`. Use `--allow-duplicate` only when the repeat is intentional and the reason is recorded in `--notes`.
+
+Push an approved Kaggle notebook and record the run handoff:
+
+```bash
+python -m kaggle_agent.cli notebooks push \
+  --path path/to/kaggle-kernel-dir \
+  --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --experiment-key <experiment-key> \
+  --kernel-slug jivrajsingh/22f3002542-notebook-2026t2 \
+  --version 3 \
+  --json
+```
 
 Check one pending run once:
 

@@ -17,6 +17,7 @@ flowchart TD
     Artifacts --> ArtifactState[(state/artifacts.json)]
     Artifacts --> ArtifactFiles[(artifacts/ ignored)]
     Kaggle --> KaggleRemote[Kaggle CLI / notebooks]
+    Kaggle --> NotebookState[(state/notebooks.json + state/runs.json)]
     GWS --> DriveRemote[Google Drive]
 ```
 

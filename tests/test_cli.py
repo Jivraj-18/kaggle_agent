@@ -8,10 +8,12 @@ from pathlib import Path
 
 
 class CliTests(unittest.TestCase):
-    def run_cli(self, *args):
+    def run_cli(self, *args, env_overrides=None):
         env = os.environ.copy()
         env["KAGGLE_AGENT_STATE_DIR"] = self.tmp.name
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+        if env_overrides:
+            env.update(env_overrides)
         return subprocess.run(
             [sys.executable, "-m", "kaggle_agent.cli", *args],
             text=True,
@@ -253,6 +255,58 @@ class CliTests(unittest.TestCase):
         body = json.loads(invalid.stdout)
         self.assertIn("competition_sources: missing demo-comp", body["errors"])
         self.assertIn("enable_internet: profile forbids internet", body["errors"])
+
+    def test_push_notebook_records_notebook_and_run(self):
+        notebook_dir = Path(self.tmp.name) / "kernel"
+        notebook_dir.mkdir()
+        (notebook_dir / "kernel-metadata.json").write_text(
+            json.dumps({"id": "user/demo-kernel", "competition_sources": ["demo-comp"]}),
+            encoding="utf-8",
+        )
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+print("Kernel push queued")
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        pushed = self.run_cli(
+            "notebooks",
+            "push",
+            "--path",
+            str(notebook_dir),
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(pushed.returncode, 0, pushed.stderr)
+        body = json.loads(pushed.stdout)
+        self.assertEqual(body["run"]["run_id"], "user/demo-kernel:v2")
+        self.assertEqual(body["notebook"]["status"], "pushed")
+        call = json.loads(calls.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(call, ["kaggle", "kernels", "push", "-p", str(notebook_dir)])
+
+        runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
+        notebooks = json.loads((Path(self.tmp.name) / "notebooks.json").read_text(encoding="utf-8"))
+        self.assertEqual(runs[0]["next_action"], "check_status")
+        self.assertEqual(notebooks[0]["source_sha256"], body["notebook"]["source_sha256"])
 
     def test_add_list_and_complete_task(self):
         add = self.run_cli(

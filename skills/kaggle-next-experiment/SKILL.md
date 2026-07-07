@@ -38,6 +38,16 @@ description: Plan, improve, or continue a Kaggle competition. Use for requests l
    ```bash
    python -m kaggle_agent.cli notebooks validate-metadata <kernel-metadata.json> --competition-slug <slug> --json
    ```
-9. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+9. Push the approved notebook and register the Kaggle run:
+   ```bash
+   python -m kaggle_agent.cli notebooks push \
+     --path <kernel-dir> \
+     --competition-slug <slug> \
+     --experiment-key <experiment-key> \
+     --kernel-slug <owner/kernel> \
+     --version <version> \
+     --json
+   ```
+10. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not push notebooks or submit if Reviewer says `revise`, `stop`, or `escalate`.

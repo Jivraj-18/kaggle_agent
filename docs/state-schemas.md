@@ -135,11 +135,12 @@ Notebook files should live in Google Drive or Kaggle, not Git:
   "drive_file_id": "google-drive-id",
   "source_sha256": "sha256",
   "status": "pushed",
+  "local_path": "/ignored/local/kernel-dir",
   "notes": ""
 }
 ```
 
-Use `notebooks add/list` to track references.
+Use `notebooks add/list` to track references. Use `notebooks push` after Reviewer approval; it calls Kaggle CLI, records the notebook directory hash, and creates the matching `runs.json` handoff record with `next_action: check_status`.
 
 Before pushing a Kaggle notebook, validate metadata:
 

@@ -5,10 +5,10 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .artifacts import find_output_artifact, find_run, record_output_artifact, review_output_artifact
+from .artifacts import find_output_artifact, find_run, record_output_artifact, review_output_artifact, sha256_dir
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
-from .kaggle_cli import kernel_output, kernel_status, list_competitions as kaggle_list_competitions
+from .kaggle_cli import kernel_output, kernel_push, kernel_status, list_competitions as kaggle_list_competitions
 from .scout import build_scout_item
 from .state import (
     append_jsonl,
@@ -200,6 +200,58 @@ def add_notebook(args: argparse.Namespace) -> None:
         "notes": args.notes or "",
     }
     emit(upsert_by_key("notebooks.json", "notebook_id", row), args.json)
+
+
+def push_notebook(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    if not args.path.is_dir():
+        raise SystemExit(f"notebook path is not a directory: {args.path}")
+    result = kernel_push(str(args.path))
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+
+    notebook_id = args.notebook_id or f"{args.kernel_slug}:v{args.version or 'latest'}"
+    notebook = upsert_by_key(
+        "notebooks.json",
+        "notebook_id",
+        {
+            "notebook_id": notebook_id,
+            "competition_slug": args.competition_slug,
+            "experiment_key": args.experiment_key,
+            "kernel_slug": args.kernel_slug,
+            "version": args.version,
+            "source_sha256": sha256_dir(args.path),
+            "status": "pushed",
+            "local_path": str(args.path),
+            "last_push_stdout": result.stdout.strip(),
+            "last_push_stderr": result.stderr.strip(),
+        },
+    )
+    run = upsert_by_key(
+        "runs.json",
+        "run_id",
+        {
+            "run_id": f"{args.kernel_slug}:v{args.version or 'latest'}",
+            "competition_slug": args.competition_slug,
+            "experiment_key": args.experiment_key,
+            "kernel_slug": args.kernel_slug,
+            "version": args.version,
+            "status": "pushed",
+            "outputs_pulled": False,
+            "submitted": False,
+            "next_action": "check_status",
+        },
+    )
+    emit({"notebook": notebook, "run": run, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
 
 
 def list_notebooks(args: argparse.Namespace) -> None:
@@ -755,6 +807,15 @@ def build_parser() -> argparse.ArgumentParser:
     notebook_list.add_argument("--status")
     notebook_list.add_argument("--json", action="store_true")
     notebook_list.set_defaults(func=list_notebooks)
+    notebook_push = notebooks_sub.add_parser("push")
+    notebook_push.add_argument("--path", type=Path, required=True)
+    notebook_push.add_argument("--notebook-id")
+    notebook_push.add_argument("--competition-slug", required=True)
+    notebook_push.add_argument("--experiment-key")
+    notebook_push.add_argument("--kernel-slug", required=True)
+    notebook_push.add_argument("--version", type=int)
+    notebook_push.add_argument("--json", action="store_true")
+    notebook_push.set_defaults(func=push_notebook)
     notebook_validate = notebooks_sub.add_parser("validate-metadata")
     notebook_validate.add_argument("metadata_file", type=Path)
     notebook_validate.add_argument("--competition-slug", required=True)
