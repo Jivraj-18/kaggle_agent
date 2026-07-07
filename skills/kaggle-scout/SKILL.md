@@ -27,4 +27,4 @@ description: Find, scout, or evaluate new Kaggle competitions to join. Use for r
    ```bash
    uv run python -m kaggle_agent.cli drive-sync push --root state --json
    ```
-8. End the session with `uv run python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+8. End the session. On Claude Code, prefer `sessions end <session-id> --outcome "<summary>" --transcript-file <path-to-.claude/projects/.../SESSION.jsonl> --json` over manual `--tokens-*` (see docs/architecture.md#observability).

@@ -124,7 +124,7 @@ Append one completed session record per coding-agent session:
 {"session_id":"20260707T120000Z-codex","harness":"codex","model":"gpt-5","skill_invoked":"kaggle-check-updates","competition_slug":"example","started_at":"2026-07-07T12:00:00Z","ended_at":"2026-07-07T12:10:00Z","personas_used":["reviewer","summarizer"],"state_writes":["runs.json","lessons.md"],"outcome":"checked_pending_runs","human_interventions":0,"tokens":{"input":1000,"output":200,"cache_read":300,"source":"self-report"},"estimated_cost_usd":0.12}
 ```
 
-Use `sessions start` and `sessions end`; do not hand-edit JSONL.
+Use `sessions start` and `sessions end`; do not hand-edit JSONL. `tokens.source` is one of `self-report` (manual `--tokens-*` flags) or `claude-transcript-parse` (`sessions end --transcript-file <path>`, Claude Code only).
 
 ## observability/metrics.json
 

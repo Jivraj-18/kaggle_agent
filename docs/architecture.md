@@ -139,6 +139,15 @@ uv run python -m kaggle_agent.cli sessions start --harness <harness> --model <mo
 uv run python -m kaggle_agent.cli sessions end <session-id> --outcome "<summary>" --tokens-input <n> --tokens-output <n> --json
 ```
 
+On Claude Code, prefer parsing real usage from the transcript over self-reporting:
+
+```bash
+uv run python -m kaggle_agent.cli sessions end <session-id> --outcome "<summary>" \
+  --transcript-file ~/.claude/projects/<project-slug>/<claude-session-uuid>.jsonl --json
+```
+
+The Claude Code session UUID is the directory segment before `/scratchpad` in the scratchpad path given in the system prompt. `--transcript-file` overrides `--tokens-*` and sets `tokens.source` to `claude-transcript-parse`. Codex/Gemini transcript parsers are not built yet; use `--tokens-*` with `--token-source self-report` for those harnesses.
+
 Use `experiment_key` to join:
 
 - `experiments.json`

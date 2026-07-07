@@ -49,6 +49,6 @@ description: Plan, improve, or continue a Kaggle competition. Use for requests l
      --json
    ```
    If `<kernel-dir>/kernel-metadata.json` exists, this command validates competition source and kernel id before calling Kaggle.
-10. End the session with `uv run python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+10. End the session. On Claude Code, prefer `sessions end <session-id> --outcome "<summary>" --transcript-file <path-to-.claude/projects/.../SESSION.jsonl> --json` over manual `--tokens-*` (see docs/architecture.md#observability).
 
 Do not push notebooks or submit if Reviewer says `revise`, `stop`, or `escalate`.

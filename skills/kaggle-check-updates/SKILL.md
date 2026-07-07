@@ -47,6 +47,6 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
    ```bash
    uv run python -m kaggle_agent.cli drive-sync push --root state --json
    ```
-9. End the session with `uv run python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+9. End the session. On Claude Code, prefer `sessions end <session-id> --outcome "<summary>" --transcript-file <path-to-.claude/projects/.../SESSION.jsonl> --json` over manual `--tokens-*` (see docs/architecture.md#observability).
 
 Do not continuously poll. Check once per user-triggered session unless the user explicitly asks otherwise.

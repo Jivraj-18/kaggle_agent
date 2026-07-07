@@ -11,6 +11,7 @@ flowchart TD
     CLI --> Scout[kaggle_agent/scout.py]
     CLI --> Artifacts[kaggle_agent/artifacts.py]
     CLI --> Drive[kaggle_agent/drive_sync.py]
+    CLI --> TokenUsage[kaggle_agent/token_usage.py]
     Drive --> GWS[kaggle_agent/gws_cli.py]
 
     State --> JSON[(state/*.json)]
@@ -19,6 +20,8 @@ flowchart TD
     Kaggle --> KaggleRemote[Kaggle CLI / notebooks]
     Kaggle --> NotebookState[(state/notebooks.json + state/runs.json)]
     GWS --> DriveRemote[Google Drive]
+    TokenUsage --> ClaudeTranscript[(~/.claude/projects/**/*.jsonl)]
+    TokenUsage --> SessionState[(state/observability/sessions.jsonl)]
 ```
 
 ## Agent Graph
@@ -58,6 +61,7 @@ flowchart TD
 - Google Drive behavior: edit `kaggle_agent/drive_sync.py` or `kaggle_agent/gws_cli.py`.
 - Output/log/submission artifact behavior: edit `kaggle_agent/artifacts.py`.
 - Competition scouting shape: edit `kaggle_agent/scout.py`.
+- Session token-usage parsing: edit `kaggle_agent/token_usage.py`.
 - User-facing workflow prompt: edit `skills/<workflow>/SKILL.md`.
 - Role/persona behavior: edit `agents/<role>.md`.
 - Notebook/report skeleton: edit `templates/`.
