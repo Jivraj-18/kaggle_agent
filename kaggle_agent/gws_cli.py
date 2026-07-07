@@ -28,33 +28,44 @@ def run_gws(args: list[str]) -> CommandResult:
     return CommandResult(["gws", *args], proc.returncode, proc.stdout, proc.stderr)
 
 
-def drive_upload(path: Path, name: str, parent_id: str) -> CommandResult:
-    return run_gws(
-        [
-            "drive",
-            "+upload",
-            str(path),
-            "--parent",
-            parent_id,
-            "--name",
-            name,
-        ]
-    )
+def drive_upload(path: Path, name: str, parent_id: str, dry_run: bool = False) -> CommandResult:
+    # Uses the raw `files create` method rather than the `+upload` shorthand: the
+    # shorthand sends no `fields` query param (confirmed live via --dry-run), so
+    # newly created files would silently get webViewLink/mimeType/etc. as null
+    # forever. `drive_update` already did it this way for existing files; match it
+    # so created and updated manifest entries carry the same fields.
+    body = {"name": name, "parents": [parent_id]}
+    fields = "id,name,webViewLink,mimeType,modifiedTime,size"
+    args = [
+        "drive",
+        "files",
+        "create",
+        "--upload",
+        str(path),
+        "--json",
+        json.dumps(body),
+        "--params",
+        json.dumps({"fields": fields}),
+    ]
+    if dry_run:
+        args.append("--dry-run")
+    return run_gws(args)
 
 
-def drive_update(file_id: str, path: Path, name: str) -> CommandResult:
+def drive_update(file_id: str, path: Path, name: str, dry_run: bool = False) -> CommandResult:
     body = {"name": name}
     fields = "id,name,webViewLink,mimeType,modifiedTime,size"
-    return run_gws(
-        [
-            "drive",
-            "files",
-            "update",
-            "--upload",
-            str(path),
-            "--json",
-            json.dumps(body),
-            "--params",
-            json.dumps({"fileId": file_id, "fields": fields}),
-        ]
-    )
+    args = [
+        "drive",
+        "files",
+        "update",
+        "--upload",
+        str(path),
+        "--json",
+        json.dumps(body),
+        "--params",
+        json.dumps({"fileId": file_id, "fields": fields}),
+    ]
+    if dry_run:
+        args.append("--dry-run")
+    return run_gws(args)

@@ -96,6 +96,22 @@ print(json.dumps({"id": file_id, "name": name, "webViewLink": "https://drive.tes
         calls = self.calls.read_text(encoding="utf-8").strip().splitlines()
         self.assertEqual(len(calls), len(first_body["created"]))
 
+    def test_push_upload_requests_web_view_link_field(self):
+        # drive_update already asked for `fields` including webViewLink; drive_upload
+        # (new-file path) used the `+upload` shorthand, which sends no `fields` param
+        # at all — verified live against the real gws CLI via --dry-run. New uploads
+        # would silently get drive_web_url: null forever. Assert the actual request
+        # shape here so a regression shows up without needing a live call.
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in self.calls.read_text(encoding="utf-8").strip().splitlines()]
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            args = call["args"]
+            self.assertIn("--params", args)
+            params = json.loads(args[args.index("--params") + 1])
+            self.assertIn("webViewLink", params.get("fields", ""))
+
     def test_push_updates_existing_drive_file_when_state_changes(self):
         first = self.run_cli()
         self.assertEqual(first.returncode, 0, first.stderr)
