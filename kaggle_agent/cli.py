@@ -626,6 +626,7 @@ def recompute_metrics(args: argparse.Namespace) -> None:
                 "submissions": 0,
                 "valid_submissions": 0,
                 "best_public_score": None,
+                "score_history": [],
                 "metric_direction": metric_directions.get(key),
                 "families": {},
                 "sessions": 0,
@@ -652,6 +653,20 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         if row.get("valid"):
             data["valid_submissions"] += 1
         score = row.get("public_score")
+        if score is not None:
+            data["score_history"].append(
+                {
+                    "submission_ref": row.get("submission_ref"),
+                    "experiment_key": row.get("experiment_key"),
+                    "public_score": score,
+                    "private_score": row.get("private_score"),
+                    "cv_score": row.get("cv_score"),
+                    "rank": row.get("rank"),
+                    "percentile": row.get("percentile"),
+                    "valid": row.get("valid"),
+                    "submitted_at": row.get("submitted_at") or row.get("created_at"),
+                }
+            )
         if score is not None and (
             data["best_public_score"] is None
             or (data.get("metric_direction") == "minimize" and score < data["best_public_score"])
@@ -669,6 +684,9 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         data["tokens"]["output"] += tokens.get("output") or 0
         data["tokens"]["cache_read"] += tokens.get("cache_read") or 0
         data["estimated_cost_usd"] += row.get("estimated_cost_usd") or 0
+
+    for data in competitions.values():
+        data["score_history"].sort(key=lambda row: row.get("submitted_at") or "")
 
     metrics = {
         "generated_at": utc_now(),

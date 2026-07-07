@@ -627,6 +627,11 @@ print("Successfully submitted to competition")
         self.assertEqual(body["competitions"]["demo-comp"]["runs"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["failed_runs"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["best_public_score"], 0.7)
+        self.assertEqual(
+            [row["public_score"] for row in body["competitions"]["demo-comp"]["score_history"]],
+            [0.8, 0.7],
+        )
+        self.assertEqual(body["competitions"]["demo-comp"]["score_history"][1]["experiment_key"], "exp-key-2")
         self.assertEqual(body["competitions"]["demo-comp"]["sessions"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["tokens"]["input"], 100)
         self.assertEqual(body["sessions"]["total_input_tokens"], 100)
