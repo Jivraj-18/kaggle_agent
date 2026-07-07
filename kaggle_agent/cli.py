@@ -8,7 +8,13 @@ from typing import Any
 from .artifacts import find_output_artifact, find_run, record_output_artifact, review_output_artifact, sha256_dir
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
-from .kaggle_cli import kernel_output, kernel_push, kernel_status, list_competitions as kaggle_list_competitions
+from .kaggle_cli import (
+    competition_submit,
+    kernel_output,
+    kernel_push,
+    kernel_status,
+    list_competitions as kaggle_list_competitions,
+)
 from .scout import build_scout_item
 from .state import (
     append_jsonl,
@@ -397,6 +403,44 @@ def add_submission(args: argparse.Namespace) -> None:
         "notes": args.notes or "",
     }
     emit(upsert_by_key("submissions.json", "submission_ref", row), args.json)
+
+
+def submit_file(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    if not args.file.is_file():
+        raise SystemExit(f"submission file not found: {args.file}")
+    result = competition_submit(args.competition_slug, str(args.file), args.message)
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+
+    digest = file_sha256(args.file)
+    row = {
+        "submission_ref": args.ref or f"{args.competition_slug}:{digest[:12]}",
+        "competition_slug": args.competition_slug,
+        "experiment_key": args.experiment_key,
+        "kernel_slug": args.kernel_slug,
+        "version": args.version,
+        "file_name": args.file.name,
+        "file_path": str(args.file),
+        "file_sha256": digest,
+        "message": args.message,
+        "status": "submitted",
+        "valid": True,
+        "submitted_at": utc_now(),
+        "last_submit_stdout": result.stdout.strip(),
+        "last_submit_stderr": result.stderr.strip(),
+    }
+    submission = upsert_by_key("submissions.json", "submission_ref", row)
+    emit({"submission": submission, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
 
 
 def list_submissions(args: argparse.Namespace) -> None:
@@ -902,6 +946,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub_list.add_argument("--competition-slug")
     sub_list.add_argument("--json", action="store_true")
     sub_list.set_defaults(func=list_submissions)
+    sub_submit = submissions_sub.add_parser("submit-file")
+    sub_submit.add_argument("--competition-slug", required=True)
+    sub_submit.add_argument("--file", type=Path, required=True)
+    sub_submit.add_argument("--message", required=True)
+    sub_submit.add_argument("--ref")
+    sub_submit.add_argument("--experiment-key")
+    sub_submit.add_argument("--kernel-slug")
+    sub_submit.add_argument("--version", type=int)
+    sub_submit.add_argument("--json", action="store_true")
+    sub_submit.set_defaults(func=submit_file)
 
     return parser
 

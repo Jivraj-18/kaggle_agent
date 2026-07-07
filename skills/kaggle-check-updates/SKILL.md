@@ -28,10 +28,21 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
    - CV/public score movement;
    - rule or leakage risk;
    - whether next action is improve, stop, triage, or submit.
-6. Update lessons and sync state:
+6. If Reviewer approves an official CSV submission and the user has approved submitting, upload the reviewed file without rerunning the notebook:
+   ```bash
+   python -m kaggle_agent.cli submissions submit-file \
+     --competition-slug <slug> \
+     --file <path/to/submission.csv> \
+     --message "<experiment/run summary>" \
+     --experiment-key <experiment-key> \
+     --kernel-slug <owner/kernel> \
+     --version <version> \
+     --json
+   ```
+7. Update lessons and sync state:
    ```bash
    python -m kaggle_agent.cli drive-sync push --root state --json
    ```
-7. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+8. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not continuously poll. Check once per user-triggered session unless the user explicitly asks otherwise.

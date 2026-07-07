@@ -363,6 +363,68 @@ print("Kernel push queued")
         self.assertEqual(body["cv_score"], 0.75)
         self.assertTrue(body["valid"])
 
+    def test_submit_file_calls_kaggle_and_records_submission(self):
+        submission = Path(self.tmp.name) / "submission.csv"
+        submission.write_text("id,target\n1,0.5\n", encoding="utf-8")
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+print("Successfully submitted to competition")
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        submitted = self.run_cli(
+            "submissions",
+            "submit-file",
+            "--competition-slug",
+            "demo-comp",
+            "--file",
+            str(submission),
+            "--message",
+            "exp-key-1 candidate",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(submitted.returncode, 0, submitted.stderr)
+        body = json.loads(submitted.stdout)
+        self.assertEqual(body["submission"]["competition_slug"], "demo-comp")
+        self.assertEqual(body["submission"]["experiment_key"], "exp-key-1")
+        self.assertEqual(body["submission"]["status"], "submitted")
+        self.assertTrue(body["submission"]["valid"])
+        call = json.loads(calls.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(
+            call,
+            [
+                "kaggle",
+                "competitions",
+                "submit",
+                "-c",
+                "demo-comp",
+                "-f",
+                str(submission),
+                "-m",
+                "exp-key-1 candidate",
+            ],
+        )
+        rows = json.loads((Path(self.tmp.name) / "submissions.json").read_text(encoding="utf-8"))
+        self.assertEqual(rows[0]["file_sha256"], body["submission"]["file_sha256"])
+
     def test_pull_output_from_directory_records_artifact_and_updates_run(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"
         output_dir.mkdir()

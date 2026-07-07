@@ -98,6 +98,9 @@ Reader writes one profile per competition:
   "kernel_slug": "owner/kernel",
   "version": 1,
   "file_name": "submission.csv",
+  "file_path": "/ignored/local/submission.csv",
+  "file_sha256": "sha256",
+  "message": "exp001 reviewed candidate",
   "status": "COMPLETE",
   "valid": true,
   "cv_score": 0.75,
@@ -108,6 +111,8 @@ Reader writes one profile per competition:
   "notes": ""
 }
 ```
+
+Use `submissions submit-file` only after output review and human approval for official submissions. Use `submissions add` to backfill Kaggle score/rank fields after the leaderboard updates.
 
 ## observability/sessions.jsonl
 

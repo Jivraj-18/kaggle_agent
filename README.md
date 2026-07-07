@@ -25,7 +25,7 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent notebooks validate-metadata`: check Kaggle metadata before push.
 - `kaggle-agent tasks add/list/complete`: record cross-session next actions.
 - `kaggle-agent runs add/list/check/pull-output/review-output`: record Kaggle notebook runs, check one run on demand, and review outputs.
-- `kaggle-agent submissions add/list`: record submitted files and scores.
+- `kaggle-agent submissions add/list/submit-file`: submit reviewed CSV files and record submitted files/scores.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.
 - `kaggle-agent experiments add/list`: record planned heavy experiments before notebook push and block exact repeats.
 - `kaggle-agent drive-sync push`: copy changed local state/data files to Google Drive without deleting history.
@@ -130,6 +130,15 @@ python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-20
 Record a submission:
 
 ```bash
+python -m kaggle_agent.cli submissions submit-file \
+  --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --file artifacts/heavy-equipment/run-v3/submission.csv \
+  --message "exp001 reviewed candidate" \
+  --experiment-key <experiment-key> \
+  --kernel-slug jivrajsingh/22f3002542-notebook-2026t2 \
+  --version 3 \
+  --json
+
 python -m kaggle_agent.cli submissions add \
   --ref 54414716 \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \

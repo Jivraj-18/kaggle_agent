@@ -51,6 +51,10 @@ def kernel_push(path: str) -> CommandResult:
     return run_kaggle(["kernels", "push", "-p", path])
 
 
+def competition_submit(competition_slug: str, file_path: str, message: str) -> CommandResult:
+    return run_kaggle(["competitions", "submit", "-c", competition_slug, "-f", file_path, "-m", message])
+
+
 def list_competitions(group: str, page_size: int = 100, search: str | None = None) -> tuple[list[dict], CommandResult]:
     args = [
         "competitions",
