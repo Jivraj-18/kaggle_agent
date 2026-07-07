@@ -20,6 +20,12 @@ FAILURE_CLASSES = {
     "unknown",
 }
 
+REQUIRED_FIELDS = {
+    "experiments.json": ["competition_slug", "experiment_key", "hypothesis"],
+    "runs.json": ["run_id", "competition_slug"],
+    "submissions.json": ["submission_ref", "competition_slug"],
+}
+
 
 def read_json(name: str, default: Any) -> Any:
     path = STATE_DIR / name
@@ -109,6 +115,11 @@ def validate_state() -> list[str]:
         direction = row.get("metric_direction")
         if direction is not None and direction not in {"maximize", "minimize"}:
             errors.append(f"profiles.json[{idx}].metric_direction: expected one of maximize, minimize")
+    for name, fields in REQUIRED_FIELDS.items():
+        for idx, row in enumerate(read_json(name, [])):
+            for field in fields:
+                if row.get(field) in {None, ""}:
+                    errors.append(f"{name}[{idx}].{field}: missing required field")
     for idx, row in enumerate(read_json("runs.json", [])):
         failure_class = row.get("failure_class")
         if failure_class is not None and failure_class not in FAILURE_CLASSES:

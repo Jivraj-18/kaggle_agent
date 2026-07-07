@@ -61,6 +61,18 @@ class StateTests(unittest.TestCase):
         self.assertIn("profiles.json[0].metric_direction: expected one of maximize, minimize", errors)
         self.assertIn("runs.json[0].failure_class: unknown failure class mystery", errors)
 
+    def test_validate_state_checks_required_lineage_fields(self):
+        self.state.ensure_state_files()
+        (Path(self.tmp.name) / "experiments.json").write_text(json.dumps([{"competition_slug": "demo"}]))
+        (Path(self.tmp.name) / "runs.json").write_text(json.dumps([{"run_id": "run-1"}]))
+        (Path(self.tmp.name) / "submissions.json").write_text(json.dumps([{"submission_ref": "sub-1"}]))
+
+        errors = self.state.validate_state()
+        self.assertIn("experiments.json[0].experiment_key: missing required field", errors)
+        self.assertIn("experiments.json[0].hypothesis: missing required field", errors)
+        self.assertIn("runs.json[0].competition_slug: missing required field", errors)
+        self.assertIn("submissions.json[0].competition_slug: missing required field", errors)
+
 
 if __name__ == "__main__":
     unittest.main()
