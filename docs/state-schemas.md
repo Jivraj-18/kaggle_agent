@@ -52,6 +52,24 @@ triage_fix
 submission_review
 ```
 
+## profiles.json
+
+Reader writes one profile per competition:
+
+```json
+{
+  "competition_slug": "example",
+  "problem_type": "tabular_regression",
+  "metric_name": "RMSLE",
+  "metric_direction": "minimize",
+  "submission_id_column": "id",
+  "submission_target_column": "target",
+  "internet_allowed": false,
+  "external_data_allowed": false,
+  "notes": "Facts extracted from competition rules."
+}
+```
+
 ## runs.json
 
 ```json

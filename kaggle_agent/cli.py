@@ -58,6 +58,41 @@ def list_competitions(args: argparse.Namespace) -> None:
     emit(rows, args.json)
 
 
+def parse_bool(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected boolean, got {value!r}")
+
+
+def add_profile(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    row = {
+        "competition_slug": args.competition_slug,
+        "problem_type": args.problem_type,
+        "metric_name": args.metric_name,
+        "metric_direction": args.metric_direction,
+        "submission_id_column": args.submission_id_column,
+        "submission_target_column": args.submission_target_column,
+        "internet_allowed": args.internet_allowed,
+        "external_data_allowed": args.external_data_allowed,
+        "notes": args.notes or "",
+    }
+    emit(upsert_by_key("profiles.json", "competition_slug", row), args.json)
+
+
+def list_profiles(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    rows = read_list("profiles.json")
+    if args.competition_slug:
+        rows = [row for row in rows if row.get("competition_slug") == args.competition_slug]
+    emit(rows, args.json)
+
+
 def add_run(args: argparse.Namespace) -> None:
     ensure_state_files()
     row = {
@@ -275,6 +310,7 @@ def resume_context(args: argparse.Namespace) -> None:
     context = {
         "summary": {
             "competitions": len(read_json("competitions.json", [])),
+            "profiles": len(read_json("profiles.json", [])),
             "experiments": len(experiments),
             "pending_experiments": len(pending_experiments),
             "runs": len(runs),
@@ -286,6 +322,7 @@ def resume_context(args: argparse.Namespace) -> None:
         },
         "state_files": [
             "state/competitions.json",
+            "state/profiles.json",
             "state/experiments.json",
             "state/runs.json",
             "state/submissions.json",
@@ -575,6 +612,25 @@ def build_parser() -> argparse.ArgumentParser:
     comp_list.add_argument("--decision")
     comp_list.add_argument("--json", action="store_true")
     comp_list.set_defaults(func=list_competitions)
+
+    profiles = sub.add_parser("profiles")
+    profiles_sub = profiles.add_subparsers(dest="profile_command", required=True)
+    profile_add = profiles_sub.add_parser("add")
+    profile_add.add_argument("competition_slug")
+    profile_add.add_argument("--problem-type")
+    profile_add.add_argument("--metric-name")
+    profile_add.add_argument("--metric-direction", choices=["minimize", "maximize"])
+    profile_add.add_argument("--submission-id-column")
+    profile_add.add_argument("--submission-target-column")
+    profile_add.add_argument("--internet-allowed", type=parse_bool)
+    profile_add.add_argument("--external-data-allowed", type=parse_bool)
+    profile_add.add_argument("--notes")
+    profile_add.add_argument("--json", action="store_true")
+    profile_add.set_defaults(func=add_profile)
+    profile_list = profiles_sub.add_parser("list")
+    profile_list.add_argument("--competition-slug")
+    profile_list.add_argument("--json", action="store_true")
+    profile_list.set_defaults(func=list_profiles)
 
     experiments = sub.add_parser("experiments")
     experiments_sub = experiments.add_subparsers(dest="experiment_command", required=True)

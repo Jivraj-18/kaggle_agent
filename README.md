@@ -20,6 +20,7 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent metrics recompute`: regenerate observability roll-ups.
 - `kaggle-agent validate-state`: validate state file shapes.
 - `kaggle-agent competitions add/list`: record competitions under consideration or joined.
+- `kaggle-agent profiles add/list`: record Reader-extracted competition facts.
 - `kaggle-agent runs add/list/check`: record Kaggle notebook runs and check one run on demand.
 - `kaggle-agent submissions add/list`: record submitted files and scores.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.

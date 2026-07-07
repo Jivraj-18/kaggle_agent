@@ -110,6 +110,40 @@ class CliTests(unittest.TestCase):
         self.assertIn('"slug": "demo-comp"', listing.stdout)
         self.assertIn('"decision": "join"', listing.stdout)
 
+    def test_add_and_list_competition_profile(self):
+        add = self.run_cli(
+            "profiles",
+            "add",
+            "demo-comp",
+            "--problem-type",
+            "tabular_regression",
+            "--metric-name",
+            "RMSLE",
+            "--metric-direction",
+            "minimize",
+            "--submission-id-column",
+            "id",
+            "--submission-target-column",
+            "target",
+            "--internet-allowed",
+            "false",
+            "--external-data-allowed",
+            "false",
+            "--notes",
+            "Reader extracted from rules.",
+            "--json",
+        )
+        self.assertEqual(add.returncode, 0, add.stderr)
+        profile = json.loads(add.stdout)
+        self.assertEqual(profile["competition_slug"], "demo-comp")
+        self.assertEqual(profile["metric_name"], "RMSLE")
+        self.assertFalse(profile["internet_allowed"])
+
+        listing = self.run_cli("profiles", "list", "--competition-slug", "demo-comp", "--json")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        rows = json.loads(listing.stdout)
+        self.assertEqual(rows[0]["submission_target_column"], "target")
+
     def test_add_and_list_run(self):
         add = self.run_cli(
             "runs",

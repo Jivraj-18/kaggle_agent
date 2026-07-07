@@ -25,6 +25,7 @@ Then choose the workflow from the user's English request.
 JSON state is canonical in v0:
 
 - `state/competitions.json`
+- `state/profiles.json`
 - `state/experiments.json`
 - `state/runs.json`
 - `state/submissions.json`
