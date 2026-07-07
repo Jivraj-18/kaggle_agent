@@ -800,6 +800,97 @@ print(json.dumps([{"ref": "sub-1", "fileName": "submission.csv", "status": "comp
         self.assertEqual(body["competitions"]["demo-comp"]["tokens"]["input"], 100)
         self.assertEqual(body["sessions"]["total_input_tokens"], 100)
 
+    def test_metrics_recompute_computes_derived_health_metrics(self):
+        self.run_cli("competitions", "add", "health-comp", "--decision", "joined", "--json")
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "health-comp",
+            "--kernel-slug",
+            "u/failed-run",
+            "--status",
+            "ERROR",
+            "--failure-class",
+            "code",
+            "--json",
+        )
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "health-comp",
+            "--kernel-slug",
+            "u/ok-run",
+            "--status",
+            "COMPLETE",
+            "--json",
+        )
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "health-sub-1",
+            "--competition-slug",
+            "health-comp",
+            "--public-score",
+            "0.5",
+            "--valid",
+            "--json",
+        )
+        start = self.run_cli(
+            "sessions",
+            "start",
+            "--harness",
+            "claude",
+            "--skill",
+            "kaggle-next-experiment",
+            "--competition-slug",
+            "health-comp",
+            "--json",
+        )
+        session_id = json.loads(start.stdout)["session_id"]
+        self.run_cli(
+            "sessions",
+            "end",
+            session_id,
+            "--outcome",
+            "planned",
+            "--tokens-input",
+            "10",
+            "--tokens-output",
+            "5",
+            "--estimated-cost-usd",
+            "1.0",
+            "--json",
+        )
+
+        metrics = self.run_cli("metrics", "recompute", "--json")
+        self.assertEqual(metrics.returncode, 0, metrics.stderr)
+        data = json.loads(metrics.stdout)["competitions"]["health-comp"]
+        self.assertEqual(data["failed_run_rate"], 0.5)
+        self.assertEqual(data["cost_per_valid_submission"], 1.0)
+        self.assertIsNotNone(data["days_to_first_valid_submission"])
+        self.assertGreaterEqual(data["days_to_first_valid_submission"], 0.0)
+
+    def test_metrics_recompute_leaves_derived_metrics_null_without_data(self):
+        self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "empty-comp",
+            "--family",
+            "gbdt-baseline",
+            "--hypothesis",
+            "no runs yet",
+            "--json",
+        )
+        metrics = self.run_cli("metrics", "recompute", "--json")
+        data = json.loads(metrics.stdout)["competitions"]["empty-comp"]
+        self.assertIsNone(data["failed_run_rate"])
+        self.assertIsNone(data["cost_per_valid_submission"])
+        self.assertIsNone(data["days_to_first_valid_submission"])
+
     def test_experiment_duplicate_is_blocked(self):
         plan = Path(self.tmp.name) / "plan.md"
         notebook = Path(self.tmp.name) / "notebook.py"

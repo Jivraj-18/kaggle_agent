@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from .state import (
     ensure_state_files,
     read_json,
     read_list,
+    parse_utc,
     update_matching,
     upsert_by_key,
     utc_now,
@@ -707,8 +709,11 @@ def recompute_metrics(args: argparse.Namespace) -> None:
     runs = read_list("runs.json")
     submissions = read_list("submissions.json")
     profiles = read_list("profiles.json")
+    competition_records = read_list("competitions.json")
     sessions = read_sessions_jsonl()
     metric_directions = {row.get("competition_slug"): row.get("metric_direction") for row in profiles}
+    joined_at = {row.get("slug"): parse_utc(row.get("created_at")) for row in competition_records}
+    first_valid_submission_at: dict[str, datetime] = {}
     competitions: dict[str, dict[str, Any]] = {}
 
     def bucket(slug: str | None) -> dict[str, Any]:
@@ -728,6 +733,9 @@ def recompute_metrics(args: argparse.Namespace) -> None:
                 "sessions": 0,
                 "tokens": {"input": 0, "output": 0, "cache_read": 0},
                 "estimated_cost_usd": 0,
+                "failed_run_rate": None,
+                "cost_per_valid_submission": None,
+                "days_to_first_valid_submission": None,
             },
         )
 
@@ -748,6 +756,12 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         data["submissions"] += 1
         if row.get("valid"):
             data["valid_submissions"] += 1
+            slug = row.get("competition_slug")
+            submitted_at = parse_utc(row.get("submitted_at") or row.get("created_at"))
+            if slug and submitted_at is not None:
+                current = first_valid_submission_at.get(slug)
+                if current is None or submitted_at < current:
+                    first_valid_submission_at[slug] = submitted_at
         score = row.get("public_score")
         if score is not None:
             data["score_history"].append(
@@ -781,8 +795,16 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         data["tokens"]["cache_read"] += tokens.get("cache_read") or 0
         data["estimated_cost_usd"] += row.get("estimated_cost_usd") or 0
 
-    for data in competitions.values():
+    for slug, data in competitions.items():
         data["score_history"].sort(key=lambda row: row.get("submitted_at") or "")
+        if data["runs"] > 0:
+            data["failed_run_rate"] = data["failed_runs"] / data["runs"]
+        if data["valid_submissions"] > 0:
+            data["cost_per_valid_submission"] = data["estimated_cost_usd"] / data["valid_submissions"]
+        join_time = joined_at.get(slug)
+        first_valid_time = first_valid_submission_at.get(slug)
+        if join_time is not None and first_valid_time is not None:
+            data["days_to_first_valid_submission"] = (first_valid_time - join_time).total_seconds() / 86400
 
     metrics = {
         "generated_at": utc_now(),
