@@ -68,6 +68,7 @@ Reader writes one profile per competition:
   "submission_target_column": "target",
   "internet_allowed": false,
   "external_data_allowed": false,
+  "team_name": "your-kaggle-team-name",
   "notes": "Facts extracted from competition rules."
 }
 ```
@@ -116,7 +117,7 @@ Reader writes one profile per competition:
 
 Use `submissions submit-file` only after output review and human approval for official submissions. Use `submissions add` to backfill Kaggle score/rank fields after the leaderboard updates.
 
-`rank`/`percentile` are populated by `submissions refresh-leaderboard --competition-slug <slug> --team-name <name>`, which fetches the public leaderboard (`kaggle competitions leaderboard --show`), finds the row matching `--team-name` case-insensitively, and writes rank (1-indexed) and percentile (`1 - (rank-1)/total`) onto whichever local submission has a matching `public_score`. It only searches the fetched page (`--page-size`, default 200); a team ranked below that cutoff is reported as `team_not_found_in_fetched_page` rather than guessed at. There is no stored `team_name` anywhere in state yet — the caller must supply the Kaggle team/display name for the competition each time.
+`rank`/`percentile` are populated by `submissions refresh-leaderboard --competition-slug <slug> [--team-name <name>]`, which fetches the public leaderboard (`kaggle competitions leaderboard --show`), finds the row matching the team name case-insensitively, and writes rank (1-indexed) and percentile (`1 - (rank-1)/total`) onto whichever local submission has a matching `public_score`. It only searches the fetched page (`--page-size`, default 200); a team ranked below that cutoff is reported as `team_not_found_in_fetched_page` rather than guessed at. `--team-name` falls back to `profiles.json`'s `team_name` for that competition if omitted; if neither is set, the command exits with a message telling the caller to set one via `profiles add <slug> --team-name <name>`.
 
 ## observability/sessions.jsonl
 

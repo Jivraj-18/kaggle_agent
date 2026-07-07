@@ -194,6 +194,8 @@ class CliTests(unittest.TestCase):
             "false",
             "--notes",
             "Reader extracted from rules.",
+            "--team-name",
+            "my-team",
             "--json",
         )
         self.assertEqual(add.returncode, 0, add.stderr)
@@ -201,6 +203,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(profile["competition_slug"], "demo-comp")
         self.assertEqual(profile["metric_name"], "RMSLE")
         self.assertFalse(profile["internet_allowed"])
+        self.assertEqual(profile["team_name"], "my-team")
 
         listing = self.run_cli("profiles", "list", "--competition-slug", "demo-comp", "--json")
         self.assertEqual(listing.returncode, 0, listing.stderr)
@@ -675,6 +678,46 @@ print({output_json!r})
         body = json.loads(result.stdout)
         self.assertFalse(body["ok"])
         self.assertEqual(body["reason"], "team_not_found_in_fetched_page")
+
+    def test_refresh_leaderboard_falls_back_to_profile_team_name(self):
+        self.run_cli("profiles", "add", "demo-comp", "--team-name", "profile-team", "--json")
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--public-score",
+            "0.7",
+            "--json",
+        )
+        leaderboard = json.dumps([{"teamName": "profile-team", "score": "0.7"}])
+        _, env_overrides = self.stub_uvx(leaderboard)
+
+        result = self.run_cli(
+            "submissions",
+            "refresh-leaderboard",
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+            env_overrides=env_overrides,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = json.loads(result.stdout)
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["rank"], 1)
+
+    def test_refresh_leaderboard_without_team_name_anywhere_fails_clearly(self):
+        result = self.run_cli(
+            "submissions",
+            "refresh-leaderboard",
+            "--competition-slug",
+            "no-profile-comp",
+            "--json",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--team-name", result.stderr)
 
     def test_pull_output_from_directory_records_artifact_and_updates_run(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"

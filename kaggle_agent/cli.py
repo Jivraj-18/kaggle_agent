@@ -91,6 +91,7 @@ def add_profile(args: argparse.Namespace) -> None:
         "submission_target_column": args.submission_target_column,
         "internet_allowed": args.internet_allowed,
         "external_data_allowed": args.external_data_allowed,
+        "team_name": args.team_name,
         "notes": args.notes or "",
     }
     emit(upsert_by_key("profiles.json", "competition_slug", row), args.json)
@@ -528,6 +529,18 @@ def refresh_submissions(args: argparse.Namespace) -> None:
 
 def refresh_leaderboard_rank(args: argparse.Namespace) -> None:
     ensure_state_files()
+    team_name = args.team_name
+    if not team_name:
+        profile = next(
+            (row for row in read_list("profiles.json") if row.get("competition_slug") == args.competition_slug),
+            None,
+        )
+        team_name = profile.get("team_name") if profile else None
+    if not team_name:
+        raise SystemExit(
+            "no team name: pass --team-name or set it with "
+            "`profiles add <slug> --team-name <name>` first"
+        )
     result = competition_leaderboard(args.competition_slug, page_size=args.page_size)
     if result.returncode != 0:
         emit(
@@ -542,7 +555,7 @@ def refresh_leaderboard_rank(args: argparse.Namespace) -> None:
         raise SystemExit(result.returncode)
 
     rows = json.loads(result.stdout or "[]")
-    team_name = args.team_name.strip().lower()
+    team_name = team_name.strip().lower()
     match_idx = next(
         (idx for idx, row in enumerate(rows) if str(row.get("teamName", "")).strip().lower() == team_name),
         None,
@@ -1044,6 +1057,7 @@ def build_parser() -> argparse.ArgumentParser:
     profile_add.add_argument("--submission-target-column")
     profile_add.add_argument("--internet-allowed", type=parse_bool)
     profile_add.add_argument("--external-data-allowed", type=parse_bool)
+    profile_add.add_argument("--team-name")
     profile_add.add_argument("--notes")
     profile_add.add_argument("--json", action="store_true")
     profile_add.set_defaults(func=add_profile)
@@ -1212,7 +1226,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub_refresh_leaderboard = submissions_sub.add_parser("refresh-leaderboard")
     sub_refresh_leaderboard.add_argument("--competition-slug", required=True)
-    sub_refresh_leaderboard.add_argument("--team-name", required=True)
+    sub_refresh_leaderboard.add_argument("--team-name")
     sub_refresh_leaderboard.add_argument("--page-size", type=int, default=200)
     sub_refresh_leaderboard.add_argument("--json", action="store_true")
     sub_refresh_leaderboard.set_defaults(func=refresh_leaderboard_rank)
