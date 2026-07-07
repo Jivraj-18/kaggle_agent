@@ -110,6 +110,61 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(json.loads(lines[0])["estimated_cost_usd"], 0.12)
 
+    def test_session_end_reads_tokens_from_claude_transcript(self):
+        start = self.run_cli(
+            "sessions",
+            "start",
+            "--harness",
+            "claude",
+            "--model",
+            "claude-sonnet-5",
+            "--skill",
+            "kaggle-check-updates",
+            "--json",
+        )
+        session = json.loads(start.stdout)
+
+        transcript = Path(self.tmp.name) / "transcript.jsonl"
+        transcript.write_text(
+            "\n".join(
+                json.dumps(row)
+                for row in [
+                    {"type": "user", "message": {"role": "user", "content": "hi"}},
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "model": "claude-sonnet-5",
+                            "usage": {
+                                "input_tokens": 400,
+                                "output_tokens": 80,
+                                "cache_read_input_tokens": 120,
+                                "cache_creation_input_tokens": 30,
+                            },
+                        },
+                    },
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        end = self.run_cli(
+            "sessions",
+            "end",
+            session["session_id"],
+            "--outcome",
+            "checked_pending_runs",
+            "--transcript-file",
+            str(transcript),
+            "--json",
+        )
+        self.assertEqual(end.returncode, 0, end.stderr)
+        record = json.loads(end.stdout)
+        self.assertEqual(record["tokens"]["input"], 400)
+        self.assertEqual(record["tokens"]["output"], 80)
+        self.assertEqual(record["tokens"]["cache_read"], 120)
+        self.assertEqual(record["tokens"]["source"], "claude-transcript-parse")
+
     def test_add_and_list_competition(self):
         add = self.run_cli("competitions", "add", "demo-comp", "--title", "Demo", "--decision", "join")
         self.assertEqual(add.returncode, 0, add.stderr)

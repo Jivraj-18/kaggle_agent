@@ -17,6 +17,7 @@ from .kaggle_cli import (
     list_competitions as kaggle_list_competitions,
 )
 from .scout import build_scout_item
+from .token_usage import parse_claude_transcript
 from .state import (
     append_jsonl,
     ensure_state_files,
@@ -648,19 +649,35 @@ def end_session(args: argparse.Namespace) -> None:
     current = read_json("observability/current_session.json", {})
     if current and current.get("session_id") != args.session_id:
         raise SystemExit(f"active session mismatch: {current.get('session_id')} != {args.session_id}")
+    tokens_input = args.tokens_input
+    tokens_output = args.tokens_output
+    tokens_cache_read = args.tokens_cache_read
+    token_source = args.token_source
+    model = current.get("model")
+    if args.transcript_file:
+        transcript_path = Path(args.transcript_file)
+        if not transcript_path.exists():
+            raise SystemExit(f"transcript file not found: {transcript_path}")
+        usage = parse_claude_transcript(transcript_path)
+        tokens_input = usage["input"]
+        tokens_output = usage["output"]
+        tokens_cache_read = usage["cache_read"]
+        token_source = "claude-transcript-parse"
+        model = usage["model"] or model
     record = {
         **current,
         "session_id": args.session_id,
+        "model": model,
         "ended_at": utc_now(),
         "personas_used": args.personas or [],
         "state_writes": args.state_writes or [],
         "outcome": args.outcome,
         "human_interventions": args.human_interventions,
         "tokens": {
-            "input": args.tokens_input,
-            "output": args.tokens_output,
-            "cache_read": args.tokens_cache_read,
-            "source": args.token_source,
+            "input": tokens_input,
+            "output": tokens_output,
+            "cache_read": tokens_cache_read,
+            "source": token_source,
         },
         "estimated_cost_usd": args.estimated_cost_usd,
     }
@@ -879,6 +896,10 @@ def build_parser() -> argparse.ArgumentParser:
     sess_end.add_argument("--tokens-output", type=int)
     sess_end.add_argument("--tokens-cache-read", type=int)
     sess_end.add_argument("--token-source")
+    sess_end.add_argument(
+        "--transcript-file",
+        help="Path to a Claude Code transcript JSONL; overrides --tokens-* with parsed totals.",
+    )
     sess_end.add_argument("--estimated-cost-usd", type=float)
     sess_end.add_argument("--human-interventions", type=int, default=0)
     sess_end.add_argument("--json", action="store_true")
