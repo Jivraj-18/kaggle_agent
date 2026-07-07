@@ -218,10 +218,32 @@ def add_notebook(args: argparse.Namespace) -> None:
     emit(upsert_by_key("notebooks.json", "notebook_id", row), args.json)
 
 
+def notebook_metadata_errors(metadata: dict[str, Any], competition_slug: str, kernel_slug: str | None = None) -> list[str]:
+    profile = next((row for row in read_list("profiles.json") if row.get("competition_slug") == competition_slug), {})
+    errors: list[str] = []
+    if competition_slug not in (metadata.get("competition_sources") or []):
+        errors.append(f"competition_sources: missing {competition_slug}")
+    if kernel_slug and metadata.get("id") != kernel_slug:
+        errors.append(f"id: expected {kernel_slug}")
+    if profile.get("internet_allowed") is False and metadata.get("enable_internet") is True:
+        errors.append("enable_internet: profile forbids internet")
+    return errors
+
+
 def push_notebook(args: argparse.Namespace) -> None:
     ensure_state_files()
     if not args.path.is_dir():
         raise SystemExit(f"notebook path is not a directory: {args.path}")
+    metadata_file = args.path / "kernel-metadata.json"
+    if metadata_file.exists():
+        errors = notebook_metadata_errors(
+            json.loads(metadata_file.read_text(encoding="utf-8")),
+            args.competition_slug,
+            args.kernel_slug,
+        )
+        if errors:
+            emit({"ok": False, "errors": errors}, args.json)
+            raise SystemExit(1)
     result = kernel_push(str(args.path))
     if result.returncode != 0:
         emit(
@@ -283,12 +305,7 @@ def list_notebooks(args: argparse.Namespace) -> None:
 def validate_notebook_metadata(args: argparse.Namespace) -> None:
     ensure_state_files()
     metadata = json.loads(args.metadata_file.read_text(encoding="utf-8"))
-    profile = next((row for row in read_list("profiles.json") if row.get("competition_slug") == args.competition_slug), {})
-    errors: list[str] = []
-    if args.competition_slug not in (metadata.get("competition_sources") or []):
-        errors.append(f"competition_sources: missing {args.competition_slug}")
-    if profile.get("internet_allowed") is False and metadata.get("enable_internet") is True:
-        errors.append("enable_internet: profile forbids internet")
+    errors = notebook_metadata_errors(metadata, args.competition_slug)
     result = {"ok": not errors, "errors": errors}
     emit(result, args.json)
     if errors:

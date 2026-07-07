@@ -48,6 +48,7 @@ description: Plan, improve, or continue a Kaggle competition. Use for requests l
      --version <version> \
      --json
    ```
+   If `<kernel-dir>/kernel-metadata.json` exists, this command validates competition source and kernel id before calling Kaggle.
 10. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not push notebooks or submit if Reviewer says `revise`, `stop`, or `escalate`.

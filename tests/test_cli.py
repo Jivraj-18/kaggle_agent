@@ -311,6 +311,49 @@ print("Kernel push queued")
         self.assertEqual(runs[0]["next_action"], "check_status")
         self.assertEqual(notebooks[0]["source_sha256"], body["notebook"]["source_sha256"])
 
+    def test_push_notebook_blocks_invalid_metadata_before_kaggle_cli(self):
+        notebook_dir = Path(self.tmp.name) / "kernel"
+        notebook_dir.mkdir()
+        (notebook_dir / "kernel-metadata.json").write_text(
+            json.dumps({"id": "user/wrong-kernel", "competition_sources": ["other-comp"]}),
+            encoding="utf-8",
+        )
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import os
+from pathlib import Path
+Path(os.environ["UVX_CALLS"]).write_text("called", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        pushed = self.run_cli(
+            "notebooks",
+            "push",
+            "--path",
+            str(notebook_dir),
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(pushed.returncode, 1)
+        body = json.loads(pushed.stdout)
+        self.assertIn("competition_sources: missing demo-comp", body["errors"])
+        self.assertIn("id: expected user/demo-kernel", body["errors"])
+        self.assertFalse(calls.exists())
+
     def test_add_list_and_complete_task(self):
         add = self.run_cli(
             "tasks",

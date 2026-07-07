@@ -112,6 +112,8 @@ python -m kaggle_agent.cli notebooks push \
   --json
 ```
 
+If `kernel-metadata.json` is present in the kernel directory, `notebooks push` validates competition source and kernel id before invoking Kaggle CLI.
+
 Check one pending run once:
 
 ```bash
