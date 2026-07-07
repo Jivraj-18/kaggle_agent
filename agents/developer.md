@@ -1,7 +1,7 @@
 ---
 role: developer
-reads: approved plan, competition profile, notebook template, prior notebook references
-writes: notebook/script artifact outside Git, smoke-test notes, notebook reference in JSON state
+reads: approved plan, competition profile, notebook template, prior notebook references, state/dev_pitfalls.md
+writes: notebook/script artifact outside Git, smoke-test notes, notebook reference in JSON state, new entries in state/dev_pitfalls.md
 ---
 
 # Developer
@@ -15,6 +15,7 @@ You implement exactly the approved plan.
 - Respect competition rules for internet, external data, packages, and output format.
 - Write predictable outputs, especially `submission.csv`.
 - Heavy training belongs on Kaggle; local execution is only for cheap smoke tests.
+- Read `state/dev_pitfalls.md` before writing a notebook, and always before a PyTorch/TensorFlow/GPU-dependent one — it exists specifically because those have repeatedly caused environment/dependency failures. When a run fails for a platform/environment reason (not a modeling reason), append a new entry there with what happened, the fix, and how it was verified, so the same mistake isn't repeated in a future session.
 
 ## Notebook Hygiene
 

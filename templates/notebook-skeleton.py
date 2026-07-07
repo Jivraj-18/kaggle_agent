@@ -17,7 +17,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-INPUT_DIR = Path("/kaggle/input/<competition-slug>")
+# Verified live (2026-07-07, titanic): a kernel linked to a competition via
+# `competition_sources` in kernel-metadata.json (i.e. pushed via this repo's
+# `notebooks push`, not created from the competition page's "New Notebook"
+# button) mounts data under /kaggle/input/competitions/<slug>/, NOT
+# /kaggle/input/<slug>/. See state/dev_pitfalls.md.
+INPUT_DIR = Path("/kaggle/input/competitions/<competition-slug>")
 WORKING_DIR = Path("/kaggle/working")
 SUBMISSION_PATH = WORKING_DIR / "submission.csv"
 TARGET_COLUMN = "<target>"
