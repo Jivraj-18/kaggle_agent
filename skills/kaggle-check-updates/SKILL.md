@@ -1,17 +1,9 @@
 ---
 name: kaggle-check-updates
-description: Use when the user asks to check pending Kaggle notebook runs, inspect submitted work, pull finished outputs, or decide whether recent results are good or bad.
+description: Check pending Kaggle notebook runs, inspect submitted work, pull finished outputs, and decide whether recent results are good or bad. Use for requests like "look at anything new", "check what happened", "is the submission good or bad", "check pending runs", or "pull outputs".
 ---
 
 # Kaggle Check Updates
-
-Use this skill for user requests like:
-
-- "look at anything new";
-- "check what happened";
-- "is the submission good or bad";
-- "check pending runs";
-- "pull outputs".
 
 ## Workflow
 

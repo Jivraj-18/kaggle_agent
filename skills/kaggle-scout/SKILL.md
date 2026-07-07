@@ -1,11 +1,9 @@
 ---
 name: kaggle-scout
-description: Use when the user asks to find, scout, or evaluate new Kaggle competitions to join. Uses Scout and Orchestrator personas, fetches raw Kaggle rows, and records join/watch/skip decisions.
+description: Find, scout, or evaluate new Kaggle competitions to join. Use for requests like "find new competitions", "scout Kaggle", "what should we join", or weekly competition discovery; uses Scout and Orchestrator personas, fetches raw Kaggle rows, and records join/watch/skip decisions.
 ---
 
 # Kaggle Scout
-
-Triggered by: "find new competitions", "scout Kaggle", "what should we join".
 
 ## Workflow
 

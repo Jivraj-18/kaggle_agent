@@ -1,11 +1,9 @@
 ---
 name: kaggle-next-experiment
-description: Use when the user asks to plan, improve, or continue a Kaggle competition. Routes through Orchestrator, Reader, Planner, Developer, and Reviewer personas; registers experiments before expensive Kaggle runs.
+description: Plan, improve, or continue a Kaggle competition. Use for requests like "plan next experiment", "improve score", "continue this competition", or "what should we try"; routes through Orchestrator, Reader, Planner, Developer, and Reviewer personas and registers experiments before expensive Kaggle runs.
 ---
 
 # Kaggle Next Experiment
-
-Triggered by: "plan next experiment", "improve score", "continue this competition".
 
 ## Workflow
 
