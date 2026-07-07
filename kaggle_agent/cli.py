@@ -360,10 +360,12 @@ def resume_context(args: argparse.Namespace) -> None:
     terminal = {"COMPLETE", "ERROR", "FAILED", "CANCELED", "CANCELLED"}
     runs = read_list("runs.json")
     experiments = read_list("experiments.json")
+    tasks = read_list("tasks.json")
     pending_runs = [row for row in runs if str(row.get("status", "")).upper() not in terminal]
     pending_experiments = [
         row for row in experiments if str(row.get("status", "")).lower() not in {"complete", "submitted", "stopped"}
     ]
+    open_tasks = [row for row in tasks if row.get("status") == "open"]
     context = {
         "summary": {
             "competitions": len(read_json("competitions.json", [])),
@@ -376,6 +378,7 @@ def resume_context(args: argparse.Namespace) -> None:
             "scout_snapshots": len(read_json("scout_history.json", [])),
             "notebooks": len(read_json("notebooks.json", [])),
             "artifacts": len(read_json("artifacts.json", [])),
+            "open_tasks": len(open_tasks),
         },
         "state_files": [
             "state/competitions.json",
@@ -392,6 +395,7 @@ def resume_context(args: argparse.Namespace) -> None:
         ],
         "pending_runs": pending_runs,
         "pending_experiments": pending_experiments,
+        "open_tasks": open_tasks,
         "agent_instruction": (
             "Use this as resume context only. For Kaggle updates, check pending_runs once and pull outputs only "
             "for terminal runs. For new competitions, run scout-competitions and review raw rows with lessons."
