@@ -467,6 +467,13 @@ def submit_file(args: argparse.Namespace) -> None:
         "last_submit_stderr": result.stderr.strip(),
     }
     submission = upsert_by_key("submissions.json", "submission_ref", row)
+    if args.kernel_slug:
+        run_id = f"{args.kernel_slug}:v{args.version or 'latest'}"
+        update_matching(
+            "runs.json",
+            lambda item: item.get("run_id") == run_id,
+            {"submitted": True, "next_action": "check_leaderboard"},
+        )
     emit({"submission": submission, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
 
 

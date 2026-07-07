@@ -151,6 +151,8 @@ python -m kaggle_agent.cli submissions add \
   --notes "Notebook-output submission."
 ```
 
+When `--kernel-slug` is supplied, `submit-file` marks the matching run as submitted and sets `next_action` to `check_leaderboard`.
+
 All list/summary commands support `--json` for agent-friendly parsing.
 
 `resume-context --json` includes `competition_status`, a per-competition rollup of pending runs, pending experiments, open tasks, and next action labels.

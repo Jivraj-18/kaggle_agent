@@ -412,6 +412,22 @@ Path(os.environ["UVX_CALLS"]).write_text("called", encoding="utf-8")
     def test_submit_file_calls_kaggle_and_records_submission(self):
         submission = Path(self.tmp.name) / "submission.csv"
         submission.write_text("id,target\n1,0.5\n", encoding="utf-8")
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "2",
+            "--status",
+            "COMPLETE",
+            "--next-action",
+            "human_review_submission",
+        )
         bin_dir = Path(self.tmp.name) / "bin"
         bin_dir.mkdir()
         calls = Path(self.tmp.name) / "uvx-calls.jsonl"
@@ -470,6 +486,9 @@ print("Successfully submitted to competition")
         )
         rows = json.loads((Path(self.tmp.name) / "submissions.json").read_text(encoding="utf-8"))
         self.assertEqual(rows[0]["file_sha256"], body["submission"]["file_sha256"])
+        runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
+        self.assertTrue(runs[0]["submitted"])
+        self.assertEqual(runs[0]["next_action"], "check_leaderboard")
 
     def test_pull_output_from_directory_records_artifact_and_updates_run(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"
