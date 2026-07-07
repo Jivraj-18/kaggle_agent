@@ -39,7 +39,7 @@ class CliTests(unittest.TestCase):
 
     def test_resume_context_json_is_agent_entrypoint(self):
         self.run_cli("runs", "add", "--competition-slug", "demo", "--kernel-slug", "u/k", "--status", "running")
-        self.run_cli("tasks", "add", "--task-id", "task-1", "--kind", "review_outputs")
+        self.run_cli("tasks", "add", "--task-id", "task-1", "--competition-slug", "demo", "--kind", "review_outputs")
         proc = self.run_cli("resume-context", "--json")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         body = json.loads(proc.stdout)
@@ -47,6 +47,9 @@ class CliTests(unittest.TestCase):
         self.assertEqual(body["summary"]["open_tasks"], 1)
         self.assertEqual(body["pending_runs"][0]["kernel_slug"], "u/k")
         self.assertEqual(body["open_tasks"][0]["task_id"], "task-1")
+        self.assertEqual(body["competition_status"]["demo"]["pending_runs"], 1)
+        self.assertEqual(body["competition_status"]["demo"]["open_tasks"], 1)
+        self.assertIn("check_status", body["competition_status"]["demo"]["next_actions"])
         self.assertIn("state_files", body)
         self.assertIn("state/runs.json", body["state_files"])
         self.assertIn("state/observability/sessions.jsonl", body["state_files"])

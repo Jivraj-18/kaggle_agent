@@ -151,6 +151,8 @@ python -m kaggle_agent.cli submissions add \
 
 All list/summary commands support `--json` for agent-friendly parsing.
 
+`resume-context --json` includes `competition_status`, a per-competition rollup of pending runs, pending experiments, open tasks, and next action labels.
+
 Scout active competitions:
 
 ```bash

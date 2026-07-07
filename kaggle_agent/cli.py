@@ -477,6 +477,37 @@ def resume_context(args: argparse.Namespace) -> None:
         row for row in experiments if str(row.get("status", "")).lower() not in {"complete", "submitted", "stopped"}
     ]
     open_tasks = [row for row in tasks if row.get("status") == "open"]
+
+    competition_status: dict[str, dict[str, Any]] = {}
+
+    def status_for(slug: str | None) -> dict[str, Any] | None:
+        if not slug:
+            return None
+        return competition_status.setdefault(
+            slug,
+            {"pending_runs": 0, "pending_experiments": 0, "open_tasks": 0, "next_actions": []},
+        )
+
+    def add_action(status: dict[str, Any] | None, action: str | None) -> None:
+        if status is not None and action and action not in status["next_actions"]:
+            status["next_actions"].append(action)
+
+    for row in pending_runs:
+        status = status_for(row.get("competition_slug"))
+        if status is not None:
+            status["pending_runs"] += 1
+            add_action(status, row.get("next_action"))
+    for row in pending_experiments:
+        status = status_for(row.get("competition_slug"))
+        if status is not None:
+            status["pending_experiments"] += 1
+            add_action(status, "plan_or_push")
+    for row in open_tasks:
+        status = status_for(row.get("competition_slug"))
+        if status is not None:
+            status["open_tasks"] += 1
+            add_action(status, row.get("kind"))
+
     context = {
         "summary": {
             "competitions": len(read_json("competitions.json", [])),
@@ -507,6 +538,7 @@ def resume_context(args: argparse.Namespace) -> None:
         "pending_runs": pending_runs,
         "pending_experiments": pending_experiments,
         "open_tasks": open_tasks,
+        "competition_status": competition_status,
         "agent_instruction": (
             "Use this as resume context only. For Kaggle updates, check pending_runs once and pull outputs only "
             "for terminal runs. For new competitions, run scout-competitions and review raw rows with lessons."
