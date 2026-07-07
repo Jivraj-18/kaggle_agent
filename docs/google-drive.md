@@ -19,13 +19,13 @@ The repo uses `gws` for Drive access and `config/drive.json` for the archive fol
 Push changed files:
 
 ```bash
-python -m kaggle_agent.cli drive-sync push --json
+uv run python -m kaggle_agent.cli drive-sync push --json
 ```
 
 Push a specific root:
 
 ```bash
-python -m kaggle_agent.cli drive-sync push --root state --json
+uv run python -m kaggle_agent.cli drive-sync push --root state --json
 ```
 
 The sync stores file hashes and Drive IDs in ignored local state:

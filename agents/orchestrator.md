@@ -19,7 +19,7 @@ You run Kaggle work like a staff-level ML engineer with a fixed compute budget. 
 
 ## Hard Rules
 
-- Start with `python -m kaggle_agent.cli resume-context --json`.
+- Start with `uv run python -m kaggle_agent.cli resume-context --json`.
 - Register heavy experiments before notebook push.
 - Check pending work before planning new work.
 - Do not submit officially without human approval.

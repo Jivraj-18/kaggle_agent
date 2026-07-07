@@ -52,7 +52,7 @@ The architecture goal is controlled iteration, not one-shot notebook generation.
 Heavy experiments must be registered before notebook push:
 
 ```bash
-python -m kaggle_agent.cli experiments add \
+uv run python -m kaggle_agent.cli experiments add \
   --competition-slug <slug> \
   --hypothesis "<specific hypothesis>" \
   --plan-file <plan.md> \
@@ -122,8 +122,8 @@ This keeps AutoKaggle's phase decomposition while preserving JSON as the agent-f
 Each coding-agent session should be recorded:
 
 ```bash
-python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill <skill> --json
-python -m kaggle_agent.cli sessions end <session-id> --outcome "<summary>" --tokens-input <n> --tokens-output <n> --json
+uv run python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill <skill> --json
+uv run python -m kaggle_agent.cli sessions end <session-id> --outcome "<summary>" --tokens-input <n> --tokens-output <n> --json
 ```
 
 Use `experiment_key` to join:
@@ -135,7 +135,7 @@ Use `experiment_key` to join:
 Regenerate roll-ups with:
 
 ```bash
-python -m kaggle_agent.cli metrics recompute --json
+uv run python -m kaggle_agent.cli metrics recompute --json
 ```
 
 ## Output Ingestion
@@ -143,7 +143,7 @@ python -m kaggle_agent.cli metrics recompute --json
 Terminal Kaggle runs should be pulled into ignored local artifacts and recorded in `state/artifacts.json`:
 
 ```bash
-python -m kaggle_agent.cli runs pull-output <run-id> --json
+uv run python -m kaggle_agent.cli runs pull-output <run-id> --json
 ```
 
 The artifact record joins to runs and experiments through `run_id` and `experiment_key`. Reviewer, Triage, and Summarizer use this record to decide whether the result is good, bad, invalid, or worth submitting.

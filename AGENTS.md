@@ -7,8 +7,8 @@ This repo is for coding agents operating Kaggle work across sessions.
 Start every future session with:
 
 ```bash
-python -m kaggle_agent.cli sessions start --harness <codex|claude|gemini|other> --model <model> --skill <skill-name> --json
-python -m kaggle_agent.cli resume-context --json
+uv run python -m kaggle_agent.cli sessions start --harness <codex|claude|gemini|other> --model <model> --skill <skill-name> --json
+uv run python -m kaggle_agent.cli resume-context --json
 ```
 
 Then choose the workflow from the user's English request.
@@ -66,7 +66,7 @@ Kaggle runs are expensive. Register experiments before push and check pending wo
 Before finishing, append observability:
 
 ```bash
-python -m kaggle_agent.cli sessions end <session-id> \
+uv run python -m kaggle_agent.cli sessions end <session-id> \
   --outcome "<what changed>" \
   --personas orchestrator reviewer summarizer \
   --state-writes runs.json lessons.md \

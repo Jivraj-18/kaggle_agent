@@ -47,24 +47,24 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 Initialize local state files:
 
 ```bash
-python -m kaggle_agent.cli init-state
+uv run python -m kaggle_agent.cli init-state
 ```
 
 Start a coding-agent session:
 
 ```bash
-python -m kaggle_agent.cli sessions start \
+uv run python -m kaggle_agent.cli sessions start \
   --harness codex \
   --model gpt-5 \
   --skill kaggle-next-experiment \
   --json
-python -m kaggle_agent.cli resume-context --json
+uv run python -m kaggle_agent.cli resume-context --json
 ```
 
 Record a competition:
 
 ```bash
-python -m kaggle_agent.cli competitions add heavy-equipment-selling-price-prediction-challenge \
+uv run python -m kaggle_agent.cli competitions add heavy-equipment-selling-price-prediction-challenge \
   --title "Heavy Equipment Selling Price Prediction" \
   --decision joined \
   --notes "Tabular regression, RMSLE."
@@ -73,7 +73,7 @@ python -m kaggle_agent.cli competitions add heavy-equipment-selling-price-predic
 Record a Kaggle notebook run:
 
 ```bash
-python -m kaggle_agent.cli runs add \
+uv run python -m kaggle_agent.cli runs add \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --experiment-key <experiment-key> \
   --kernel-slug jivrajsingh/22f3002542-notebook-2026t2 \
@@ -87,7 +87,7 @@ python -m kaggle_agent.cli runs add \
 Record a heavy experiment before pushing a notebook:
 
 ```bash
-python -m kaggle_agent.cli experiments add \
+uv run python -m kaggle_agent.cli experiments add \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --phase feature_engineering \
   --family feature-gbdt \
@@ -103,7 +103,7 @@ If the same competition, hypothesis, plan file hash, and notebook file hash alre
 Push an approved Kaggle notebook and record the run handoff:
 
 ```bash
-python -m kaggle_agent.cli notebooks push \
+uv run python -m kaggle_agent.cli notebooks push \
   --path path/to/kaggle-kernel-dir \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --experiment-key <experiment-key> \
@@ -117,14 +117,14 @@ If `kernel-metadata.json` is present in the kernel directory, `notebooks push` v
 Check one pending run once:
 
 ```bash
-python -m kaggle_agent.cli runs check jivrajsingh/22f3002542-notebook-2026t2:v3
+uv run python -m kaggle_agent.cli runs check jivrajsingh/22f3002542-notebook-2026t2:v3
 ```
 
 Pull outputs/logs for a terminal run:
 
 ```bash
-python -m kaggle_agent.cli runs pull-output jivrajsingh/22f3002542-notebook-2026t2:v3 --json
-python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-2026t2:v3 \
+uv run python -m kaggle_agent.cli runs pull-output jivrajsingh/22f3002542-notebook-2026t2:v3 --json
+uv run python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-2026t2:v3 \
   --sample-submission path/to/sample_submission.csv \
   --json
 ```
@@ -132,7 +132,7 @@ python -m kaggle_agent.cli runs review-output jivrajsingh/22f3002542-notebook-20
 Record a submission:
 
 ```bash
-python -m kaggle_agent.cli submissions submit-file \
+uv run python -m kaggle_agent.cli submissions submit-file \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --file artifacts/heavy-equipment/run-v3/submission.csv \
   --message "exp001 reviewed candidate" \
@@ -141,7 +141,7 @@ python -m kaggle_agent.cli submissions submit-file \
   --version 3 \
   --json
 
-python -m kaggle_agent.cli submissions add \
+uv run python -m kaggle_agent.cli submissions add \
   --ref 54414716 \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --experiment-key <experiment-key> \
@@ -156,7 +156,7 @@ When `--kernel-slug` is supplied, `submit-file` marks the matching run as submit
 Refresh submission status and scores from Kaggle:
 
 ```bash
-python -m kaggle_agent.cli submissions refresh \
+uv run python -m kaggle_agent.cli submissions refresh \
   --competition-slug heavy-equipment-selling-price-prediction-challenge \
   --json
 ```
@@ -168,7 +168,7 @@ All list/summary commands support `--json` for agent-friendly parsing.
 Scout active competitions:
 
 ```bash
-python -m kaggle_agent.cli scout-competitions --groups general community --limit 20
+uv run python -m kaggle_agent.cli scout-competitions --groups general community --limit 20
 ```
 
 Scouting is intentionally not the decision-maker. The command stores Kaggle's raw rows under `items[].raw` and adds only minimal indexing fields:
@@ -185,17 +185,17 @@ The coding agent should read the latest `state/scout_history.json` snapshot, `st
 Scout from saved Kaggle JSON without network access:
 
 ```bash
-python -m kaggle_agent.cli scout-competitions --from-file /tmp/kaggle-competitions.json --json
+uv run python -m kaggle_agent.cli scout-competitions --from-file /tmp/kaggle-competitions.json --json
 ```
 
 Push changed local state files to Google Drive:
 
 ```bash
-python -m kaggle_agent.cli drive-sync push --json
+uv run python -m kaggle_agent.cli drive-sync push --json
 ```
 
 Recompute observability roll-ups:
 
 ```bash
-python -m kaggle_agent.cli metrics recompute --json
+uv run python -m kaggle_agent.cli metrics recompute --json
 ```

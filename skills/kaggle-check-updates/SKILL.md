@@ -9,18 +9,18 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
 
 1. Start an observable session, then load context:
    ```bash
-   python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill kaggle-check-updates --json
-   python -m kaggle_agent.cli resume-context --json
+   uv run python -m kaggle_agent.cli sessions start --harness <harness> --model <model> --skill kaggle-check-updates --json
+   uv run python -m kaggle_agent.cli resume-context --json
    ```
 2. Read pending runs from `state/runs.json`.
 3. For each pending run the user asked about, check status once:
    ```bash
-   python -m kaggle_agent.cli runs check <run-id> --json
+   uv run python -m kaggle_agent.cli runs check <run-id> --json
    ```
 4. If terminal, pull Kaggle outputs/logs with Kaggle CLI and record artifacts in JSON state.
    ```bash
-   python -m kaggle_agent.cli runs pull-output <run-id> --json
-   python -m kaggle_agent.cli runs review-output <run-id> --sample-submission <sample_submission.csv> --json
+   uv run python -m kaggle_agent.cli runs pull-output <run-id> --json
+   uv run python -m kaggle_agent.cli runs review-output <run-id> --sample-submission <sample_submission.csv> --json
    ```
 5. Read `agents/reviewer.md`, `agents/triage.md`, and `agents/summarizer.md` to evaluate:
    - runtime success/failure;
@@ -30,7 +30,7 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
    - whether next action is improve, stop, triage, or submit.
 6. If Reviewer approves an official CSV submission and the user has approved submitting, upload the reviewed file without rerunning the notebook:
    ```bash
-   python -m kaggle_agent.cli submissions submit-file \
+   uv run python -m kaggle_agent.cli submissions submit-file \
      --competition-slug <slug> \
      --file <path/to/submission.csv> \
      --message "<experiment/run summary>" \
@@ -41,12 +41,12 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
    ```
 7. If a prior run has `next_action: check_leaderboard`, refresh Kaggle submission scores:
    ```bash
-   python -m kaggle_agent.cli submissions refresh --competition-slug <slug> --json
+   uv run python -m kaggle_agent.cli submissions refresh --competition-slug <slug> --json
    ```
 8. Update lessons and sync state:
    ```bash
-   python -m kaggle_agent.cli drive-sync push --root state --json
+   uv run python -m kaggle_agent.cli drive-sync push --root state --json
    ```
-9. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+9. End the session with `uv run python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not continuously poll. Check once per user-triggered session unless the user explicitly asks otherwise.

@@ -173,7 +173,7 @@ Use `notebooks add/list` to track references. Use `notebooks push` after Reviewe
 Before pushing a Kaggle notebook, validate metadata:
 
 ```bash
-python -m kaggle_agent.cli notebooks validate-metadata <kernel-metadata.json> --competition-slug <slug> --json
+uv run python -m kaggle_agent.cli notebooks validate-metadata <kernel-metadata.json> --competition-slug <slug> --json
 ```
 
 ## tasks.json
@@ -232,6 +232,6 @@ Kaggle outputs and pulled logs are recorded here:
 Use:
 
 ```bash
-python -m kaggle_agent.cli runs pull-output <run-id> --json
-python -m kaggle_agent.cli runs review-output <run-id> --sample-submission <sample_submission.csv> --json
+uv run python -m kaggle_agent.cli runs pull-output <run-id> --json
+uv run python -m kaggle_agent.cli runs review-output <run-id> --sample-submission <sample_submission.csv> --json
 ```
