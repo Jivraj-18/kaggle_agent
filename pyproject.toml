@@ -1,0 +1,12 @@
+[project]
+name = "kaggle-agent"
+version = "0.1.0"
+description = "Local-first Kaggle automation state and orchestration helpers"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+kaggle-agent = "kaggle_agent.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

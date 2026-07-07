@@ -1,0 +1,23 @@
+# credentials
+.kaggle/
+*.secret
+.env
+
+# local memory/state; sync/archive externally, not through git
+state/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# generated / large competition artifacts
+competitions/*/data/
+competitions/*/outputs/
+competitions/*/submissions/*.csv
+*.zip
+
+# local scratch
+/tmp/
+.DS_Store
