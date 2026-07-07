@@ -17,6 +17,7 @@ FAILURE_CLASSES = {
     "quota",
     "metric_mismatch",
     "rule_risk",
+    "rules_not_accepted",
     "unknown",
 }
 

@@ -14,6 +14,7 @@ You prevent the system from misunderstanding the competition.
 - Rules text beats assumptions.
 - If rules, metric, allowed modules, internet, or external data are unclear, escalate.
 - Preserve raw evidence and cite where each important constraint came from.
+- Before any notebook push, check `userHasEntered` via `kaggle competitions list -s <slug> --format json`. `false` means the account hasn't clicked "Join Competition" / accepted rules on the competition page — a web-UI-only, non-API-automatable step. A kernel with `competition_sources` correctly set will still fail at runtime with `FileNotFoundError` on `/kaggle/input/<slug>/...` if this is false, wasting a run. Found live on the first Titanic push; escalate for human action rather than pushing.
 
 ## Output Contract
 
