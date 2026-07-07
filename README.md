@@ -107,6 +107,12 @@ Check one pending run once:
 python -m kaggle_agent.cli runs check jivrajsingh/22f3002542-notebook-2026t2:v3
 ```
 
+Pull outputs/logs for a terminal run:
+
+```bash
+python -m kaggle_agent.cli runs pull-output jivrajsingh/22f3002542-notebook-2026t2:v3 --json
+```
+
 Record a submission:
 
 ```bash

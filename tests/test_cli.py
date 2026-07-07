@@ -158,6 +158,42 @@ class CliTests(unittest.TestCase):
         self.assertEqual(body["cv_score"], 0.75)
         self.assertTrue(body["valid"])
 
+    def test_pull_output_from_directory_records_artifact_and_updates_run(self):
+        output_dir = Path(self.tmp.name) / "kaggle-output"
+        output_dir.mkdir()
+        (output_dir / "submission.csv").write_text("id,target\n1,0.5\n", encoding="utf-8")
+        (output_dir / "run.log").write_text("done\n", encoding="utf-8")
+
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "1",
+            "--status",
+            "COMPLETE",
+        )
+
+        pulled = self.run_cli("runs", "pull-output", "user/demo-kernel:v1", "--from-dir", str(output_dir), "--json")
+        self.assertEqual(pulled.returncode, 0, pulled.stderr)
+        artifact = json.loads(pulled.stdout)
+        self.assertEqual(artifact["run_id"], "user/demo-kernel:v1")
+        self.assertEqual(artifact["competition_slug"], "demo-comp")
+        self.assertEqual(artifact["experiment_key"], "exp-key-1")
+        self.assertEqual(artifact["kind"], "kaggle_output")
+        self.assertEqual({row["name"] for row in artifact["files"]}, {"run.log", "submission.csv"})
+
+        artifacts = json.loads((Path(self.tmp.name) / "artifacts.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(artifacts), 1)
+        runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
+        self.assertTrue(runs[0]["outputs_pulled"])
+        self.assertEqual(runs[0]["next_action"], "review_outputs")
+
     def test_metrics_recompute_rolls_up_observability(self):
         self.run_cli(
             "experiments",

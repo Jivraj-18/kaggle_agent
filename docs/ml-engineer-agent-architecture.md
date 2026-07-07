@@ -138,6 +138,16 @@ Regenerate roll-ups with:
 python -m kaggle_agent.cli metrics recompute --json
 ```
 
+## Output Ingestion
+
+Terminal Kaggle runs should be pulled into ignored local artifacts and recorded in `state/artifacts.json`:
+
+```bash
+python -m kaggle_agent.cli runs pull-output <run-id> --json
+```
+
+The artifact record joins to runs and experiments through `run_id` and `experiment_key`. Reviewer, Triage, and Summarizer use this record to decide whether the result is good, bad, invalid, or worth submitting.
+
 ## State Machine
 
 ```text

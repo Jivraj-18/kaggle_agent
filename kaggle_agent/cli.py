@@ -1,12 +1,14 @@
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
+from .artifacts import find_run, record_output_artifact
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
-from .kaggle_cli import kernel_status, list_competitions as kaggle_list_competitions
+from .kaggle_cli import kernel_output, kernel_status, list_competitions as kaggle_list_competitions
 from .scout import build_scout_item
 from .state import (
     append_jsonl,
@@ -168,6 +170,42 @@ def check_run(args: argparse.Namespace) -> None:
         emit(updated or changes, args.json)
         raise SystemExit(result.returncode)
     emit(updated or changes, args.json)
+
+
+def pull_run_output(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    run = find_run(args.run_id)
+    if not run:
+        raise SystemExit(f"run not found: {args.run_id}")
+    output_dir = args.output_dir or (PROJECT_ROOT / "artifacts" / run["competition_slug"] / run["run_id"].replace("/", "__").replace(":", "__"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.from_dir:
+        if output_dir.resolve() != args.from_dir.resolve():
+            if output_dir.exists():
+                shutil.rmtree(output_dir)
+            shutil.copytree(args.from_dir, output_dir)
+        artifact = record_output_artifact(run, output_dir, "from_dir")
+        emit(artifact, args.json)
+        return
+
+    result = kernel_output(run["kernel_slug"], str(output_dir))
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "run_id": args.run_id,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+    artifact = record_output_artifact(run, output_dir, "kaggle_cli")
+    artifact["last_output_stdout"] = result.stdout.strip()
+    artifact["last_output_stderr"] = result.stderr.strip()
+    emit(artifact, args.json)
 
 
 def add_submission(args: argparse.Namespace) -> None:
@@ -580,6 +618,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_check.add_argument("run_id")
     run_check.add_argument("--json", action="store_true")
     run_check.set_defaults(func=check_run)
+    run_pull = runs_sub.add_parser("pull-output")
+    run_pull.add_argument("run_id")
+    run_pull.add_argument("--from-dir", type=Path)
+    run_pull.add_argument("--output-dir", type=Path)
+    run_pull.add_argument("--json", action="store_true")
+    run_pull.set_defaults(func=pull_run_output)
 
     submissions = sub.add_parser("submissions")
     submissions_sub = submissions.add_subparsers(dest="submission_command", required=True)

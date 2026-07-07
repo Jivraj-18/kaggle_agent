@@ -43,6 +43,10 @@ def kernel_status(kernel_slug: str) -> tuple[str, CommandResult]:
     return status, result
 
 
+def kernel_output(kernel_slug: str, output_dir: str) -> CommandResult:
+    return run_kaggle(["kernels", "output", kernel_slug, "-p", output_dir])
+
+
 def list_competitions(group: str, page_size: int = 100, search: str | None = None) -> tuple[list[dict], CommandResult]:
     args = [
         "competitions",

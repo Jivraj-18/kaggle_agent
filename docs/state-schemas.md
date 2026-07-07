@@ -100,3 +100,33 @@ Append one completed session record per coding-agent session:
 ```
 
 Use `sessions start` and `sessions end`; do not hand-edit JSONL.
+
+## artifacts.json
+
+Kaggle outputs and pulled logs are recorded here:
+
+```json
+{
+  "artifact_id": "owner/kernel:v1-output-20260707T120000Z",
+  "run_id": "owner/kernel:v1",
+  "competition_slug": "example",
+  "experiment_key": "sha256",
+  "kind": "kaggle_output",
+  "source": "kaggle_cli",
+  "local_path": "artifacts/example/owner__kernel__v1",
+  "files": [
+    {
+      "name": "submission.csv",
+      "size": 1234,
+      "sha256": "sha256"
+    }
+  ],
+  "created_at": "2026-07-07T12:00:00Z"
+}
+```
+
+Use:
+
+```bash
+python -m kaggle_agent.cli runs pull-output <run-id> --json
+```
