@@ -194,6 +194,38 @@ class CliTests(unittest.TestCase):
         self.assertTrue(runs[0]["outputs_pulled"])
         self.assertEqual(runs[0]["next_action"], "review_outputs")
 
+    def test_review_output_marks_submission_candidate(self):
+        output_dir = Path(self.tmp.name) / "kaggle-output"
+        output_dir.mkdir()
+        (output_dir / "submission.csv").write_text("id,target\n1,0.5\n", encoding="utf-8")
+        self.run_cli(
+            "runs",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "1",
+            "--status",
+            "COMPLETE",
+        )
+        self.run_cli("runs", "pull-output", "user/demo-kernel:v1", "--from-dir", str(output_dir), "--json")
+
+        reviewed = self.run_cli("runs", "review-output", "user/demo-kernel:v1", "--json")
+        self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+        review = json.loads(reviewed.stdout)
+        self.assertEqual(review["verdict"], "submission_candidate")
+        self.assertEqual(review["next_action"], "human_review_submission")
+        self.assertIn("submission_csv_present", review["passed_checks"])
+
+        artifacts = json.loads((Path(self.tmp.name) / "artifacts.json").read_text(encoding="utf-8"))
+        self.assertEqual(artifacts[0]["review"]["verdict"], "submission_candidate")
+        runs = json.loads((Path(self.tmp.name) / "runs.json").read_text(encoding="utf-8"))
+        self.assertEqual(runs[0]["next_action"], "human_review_submission")
+
     def test_metrics_recompute_rolls_up_observability(self):
         self.run_cli(
             "experiments",

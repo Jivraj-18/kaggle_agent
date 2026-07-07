@@ -28,6 +28,7 @@ Use this skill for user requests like:
 4. If terminal, pull Kaggle outputs/logs with Kaggle CLI and record artifacts in JSON state.
    ```bash
    python -m kaggle_agent.cli runs pull-output <run-id> --json
+   python -m kaggle_agent.cli runs review-output <run-id> --json
    ```
 5. Read `agents/reviewer.md`, `agents/triage.md`, and `agents/summarizer.md` to evaluate:
    - runtime success/failure;

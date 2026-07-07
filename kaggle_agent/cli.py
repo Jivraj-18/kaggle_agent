@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .artifacts import find_run, record_output_artifact
+from .artifacts import find_output_artifact, find_run, record_output_artifact, review_output_artifact
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
 from .kaggle_cli import kernel_output, kernel_status, list_competitions as kaggle_list_competitions
@@ -206,6 +206,17 @@ def pull_run_output(args: argparse.Namespace) -> None:
     artifact["last_output_stdout"] = result.stdout.strip()
     artifact["last_output_stderr"] = result.stderr.strip()
     emit(artifact, args.json)
+
+
+def review_run_output(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    run = find_run(args.run_id)
+    if not run:
+        raise SystemExit(f"run not found: {args.run_id}")
+    artifact = find_output_artifact(args.run_id)
+    if not artifact:
+        raise SystemExit(f"output artifact not found for run: {args.run_id}")
+    emit(review_output_artifact(run, artifact), args.json)
 
 
 def add_submission(args: argparse.Namespace) -> None:
@@ -624,6 +635,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_pull.add_argument("--output-dir", type=Path)
     run_pull.add_argument("--json", action="store_true")
     run_pull.set_defaults(func=pull_run_output)
+    run_review = runs_sub.add_parser("review-output")
+    run_review.add_argument("run_id")
+    run_review.add_argument("--json", action="store_true")
+    run_review.set_defaults(func=review_run_output)
 
     submissions = sub.add_parser("submissions")
     submissions_sub = submissions.add_subparsers(dest="submission_command", required=True)

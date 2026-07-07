@@ -121,6 +121,13 @@ Kaggle outputs and pulled logs are recorded here:
       "sha256": "sha256"
     }
   ],
+  "review": {
+    "verdict": "submission_candidate",
+    "next_action": "human_review_submission",
+    "passed_checks": ["submission_csv_present", "submission_csv_nonempty"],
+    "failed_checks": [],
+    "reviewed_at": "2026-07-07T12:01:00Z"
+  },
   "created_at": "2026-07-07T12:00:00Z"
 }
 ```
@@ -129,4 +136,5 @@ Use:
 
 ```bash
 python -m kaggle_agent.cli runs pull-output <run-id> --json
+python -m kaggle_agent.cli runs review-output <run-id> --json
 ```

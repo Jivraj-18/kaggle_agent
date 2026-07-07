@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from .state import read_list, update_matching, upsert_by_key, utc_now
+from .state import read_list, update_matching, upsert_by_key, utc_now, write_json
 
 
 def sha256_file(path: Path) -> str:
@@ -59,3 +59,52 @@ def record_output_artifact(run: dict[str, Any], output_dir: Path, source: str) -
 
 def find_run(run_id: str) -> dict[str, Any] | None:
     return next((row for row in read_list("runs.json") if row.get("run_id") == run_id), None)
+
+
+def find_output_artifact(run_id: str) -> dict[str, Any] | None:
+    matches = [
+        row
+        for row in read_list("artifacts.json")
+        if row.get("run_id") == run_id and row.get("kind") == "kaggle_output"
+    ]
+    return matches[-1] if matches else None
+
+
+def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any]) -> dict[str, Any]:
+    files = artifact.get("files") or []
+    by_name = {row.get("name"): row for row in files}
+    passed_checks: list[str] = []
+    failed_checks: list[str] = []
+
+    submission = by_name.get("submission.csv")
+    if submission:
+        passed_checks.append("submission_csv_present")
+        if submission.get("size", 0) > 0:
+            passed_checks.append("submission_csv_nonempty")
+        else:
+            failed_checks.append("submission_csv_nonempty")
+    else:
+        failed_checks.append("submission_csv_present")
+
+    verdict = "submission_candidate" if not failed_checks else "invalid_output"
+    next_action = "human_review_submission" if verdict == "submission_candidate" else "triage_output"
+    review = {
+        "run_id": run["run_id"],
+        "artifact_id": artifact["artifact_id"],
+        "competition_slug": run.get("competition_slug"),
+        "experiment_key": run.get("experiment_key"),
+        "verdict": verdict,
+        "next_action": next_action,
+        "passed_checks": passed_checks,
+        "failed_checks": failed_checks,
+        "reviewed_at": utc_now(),
+    }
+
+    rows = read_list("artifacts.json")
+    for idx, row in enumerate(rows):
+        if row.get("artifact_id") == artifact["artifact_id"]:
+            rows[idx] = {**row, "review": review}
+            break
+    write_json("artifacts.json", rows)
+    update_matching("runs.json", lambda row: row.get("run_id") == run["run_id"], {"next_action": next_action})
+    return review
