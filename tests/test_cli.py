@@ -29,8 +29,21 @@ class CliTests(unittest.TestCase):
     def test_state_summary_json(self):
         proc = self.run_cli("state-summary", "--json")
         self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn('"artifacts": 0', proc.stdout)
         self.assertIn('"competitions": 0', proc.stdout)
+        self.assertIn('"experiments": 0', proc.stdout)
+        self.assertIn('"notebooks": 0', proc.stdout)
         self.assertIn('"scout_snapshots": 0', proc.stdout)
+
+    def test_resume_context_json_is_agent_entrypoint(self):
+        self.run_cli("runs", "add", "--competition-slug", "demo", "--kernel-slug", "u/k", "--status", "running")
+        proc = self.run_cli("resume-context", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        body = json.loads(proc.stdout)
+        self.assertEqual(body["summary"]["pending_runs"], 1)
+        self.assertEqual(body["pending_runs"][0]["kernel_slug"], "u/k")
+        self.assertIn("state_files", body)
+        self.assertIn("state/runs.json", body["state_files"])
 
     def test_add_and_list_competition(self):
         add = self.run_cli("competitions", "add", "demo-comp", "--title", "Demo", "--decision", "join")
@@ -57,6 +70,52 @@ class CliTests(unittest.TestCase):
         listing = self.run_cli("runs", "list", "--pending")
         self.assertEqual(listing.returncode, 0, listing.stderr)
         self.assertIn('"kernel_slug": "user/demo-kernel"', listing.stdout)
+
+    def test_experiment_duplicate_is_blocked(self):
+        plan = Path(self.tmp.name) / "plan.md"
+        notebook = Path(self.tmp.name) / "notebook.py"
+        plan.write_text("hypothesis: catboost with grouped folds\n", encoding="utf-8")
+        notebook.write_text("print('write submission.csv')\n", encoding="utf-8")
+
+        first = self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--phase",
+            "feature_engineering",
+            "--hypothesis",
+            "CatBoost with grouped folds improves CV",
+            "--plan-file",
+            str(plan),
+            "--notebook-file",
+            str(notebook),
+            "--status",
+            "planned",
+            "--json",
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+        first_body = json.loads(first.stdout)
+        self.assertEqual(first_body["competition_slug"], "demo-comp")
+        self.assertEqual(first_body["phase"], "feature_engineering")
+        self.assertIn("experiment_key", first_body)
+
+        second = self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--hypothesis",
+            "CatBoost with grouped folds improves CV",
+            "--plan-file",
+            str(plan),
+            "--notebook-file",
+            str(notebook),
+            "--json",
+        )
+        self.assertEqual(second.returncode, 1)
+        self.assertIn("duplicate experiment", second.stderr)
+        self.assertIn(first_body["experiment_id"], second.stderr)
 
     def test_scout_competitions_from_file(self):
         source = Path(self.tmp.name) / "competitions.json"

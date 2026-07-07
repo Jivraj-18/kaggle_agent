@@ -20,6 +20,7 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent runs add/list/check`: record Kaggle notebook runs and check one run on demand.
 - `kaggle-agent submissions add/list`: record submitted files and scores.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.
+- `kaggle-agent experiments add/list`: record planned heavy experiments before notebook push and block exact repeats.
 - `kaggle-agent drive-sync push`: copy changed local state/data files to Google Drive without deleting history.
 
 Future commands:
@@ -66,6 +67,19 @@ python -m kaggle_agent.cli runs add \
   --submitted \
   --next-action improve_score
 ```
+
+Record a heavy experiment before pushing a notebook:
+
+```bash
+python -m kaggle_agent.cli experiments add \
+  --competition-slug heavy-equipment-selling-price-prediction-challenge \
+  --hypothesis "LightGBM with log target and grouped validation improves RMSLE" \
+  --plan-file competitions/heavy-equipment/plans/exp001.md \
+  --notebook-file competitions/heavy-equipment/notebooks/exp001.py \
+  --status planned
+```
+
+If the same competition, hypothesis, plan file hash, and notebook file hash already exist, the CLI exits with `duplicate experiment`. Use `--allow-duplicate` only when the repeat is intentional and the reason is recorded in `--notes`.
 
 Check one pending run once:
 

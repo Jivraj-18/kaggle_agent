@@ -5,11 +5,33 @@ This repo is a local-first Kaggle automation workspace. Kaggle provides remote n
 ## Principles
 
 - Keep decisions with the coding agent, not hidden scoring functions.
+- Keep JSON state as the agent-facing source of truth in v0.
 - Preserve raw Kaggle rows, rules, files, logs, notebook outputs, and scores.
 - Run ML training on Kaggle unless a local smoke test is cheap and bounded.
 - Query Kaggle only when the user asks or when a known pending item is being checked.
 - Never make official submissions without an explicit human review step.
 - Keep code in GitHub and mutable state/data/artifacts in Google Drive.
+
+## AutoKaggle Adaptation
+
+AutoKaggle's useful core is not its exact runtime. Its useful core is the discipline:
+
+1. background understanding;
+2. preliminary EDA;
+3. data cleaning;
+4. in-depth EDA;
+5. feature engineering;
+6. model building, validation, and prediction.
+
+AutoKaggle runs synchronously in a local Python interpreter. This repo cannot copy that directly because Kaggle notebooks run remotely and asynchronously. The adaptation is:
+
+- every phase becomes an experiment record in JSON state;
+- the Developer writes Kaggle notebook code instead of executing heavy code locally;
+- the Reviewer gate runs before notebook push and again after output pull;
+- the Summarizer writes durable JSON/Markdown lessons after each phase;
+- Kaggle status/output replaces AutoKaggle's immediate interpreter feedback.
+
+The architecture goal is controlled iteration, not one-shot notebook generation.
 
 ## V0 Loop
 
@@ -18,23 +40,80 @@ This repo is a local-first Kaggle automation workspace. Kaggle provides remote n
 3. The agent decides `join`, `watch`, `skip`, or `request-human-review` and records the decision.
 4. For a chosen competition, the agent snapshots rules, metric, files, sample submission, notebook constraints, and discussion notes.
 5. The agent writes a plan with a named hypothesis, expected artifact, validation method, stop condition, and compliance notes.
-6. The notebook developer creates or edits a Kaggle notebook and local smoke tests the notebook structure before push.
-7. `kaggle kernels push` starts the Kaggle run. The local state records notebook slug, version, source hash, metadata, and next action.
-8. The user later asks the agent to check pending work. The agent checks status once, pulls outputs only for terminal runs, and records logs/artifacts.
-9. The reviewer validates `submission.csv`, compares CV and leaderboard evidence, records lessons, and asks for human approval before official submit.
-10. `drive-sync push` copies changed local state/data files to Google Drive without deleting old history.
+6. Before any heavy run, the agent records the experiment in `state/experiments.json` with hypothesis, plan hash, notebook hash, status, and intended run link.
+7. The notebook developer creates or edits a Kaggle notebook and local smoke tests the notebook structure before push.
+8. `kaggle kernels push` starts the Kaggle run. The local state records notebook slug, version, source hash, metadata, and next action.
+9. The user later asks the agent to check pending work. The agent checks status once, pulls outputs only for terminal runs, and records logs/artifacts.
+10. The reviewer validates `submission.csv`, compares CV and leaderboard evidence, records lessons, and asks for human approval before official submit.
+11. `drive-sync push` copies changed local state/data files to Google Drive without deleting old history.
+
+## Experiment Memory
+
+Heavy experiments must be registered before notebook push:
+
+```bash
+python -m kaggle_agent.cli experiments add \
+  --competition-slug <slug> \
+  --hypothesis "<specific hypothesis>" \
+  --plan-file <plan.md> \
+  --notebook-file <notebook.py> \
+  --status planned
+```
+
+The CLI computes an `experiment_key` from competition slug, normalized hypothesis, plan file hash, and notebook file hash. If that key already exists, the command fails with `duplicate experiment`. This is an indexing guard, not an ML decision-maker: the coding agent still decides whether a similar-but-not-identical experiment is worthwhile.
+
+Before planning new work, future agents must read:
+
+- `state/experiments.json`
+- `state/runs.json`
+- `state/submissions.json`
+- `state/lessons.md`
+- the latest pulled notebook outputs and logs for the target competition
+
+The default stance is no repeated heavy experiment unless the agent can explain what changed and records that reason.
 
 ## Roles
 
-- Scout: fetch raw competition candidates and discussion pointers.
-- Reader: build competition profile from rules, metric, files, data shape, and constraints.
-- Planner: choose the next hypothesis and stop condition from raw context and prior lessons.
-- Developer: write notebook code and keep it compatible with competition rules.
-- Reviewer: block weak plans, invalid submissions, leakage risks, metric mismatch, and repeated churn.
-- Triage: classify notebook errors and decide whether to fix, retry, or escalate.
-- Summarizer: write durable lessons that future agents can reuse.
+- Reader: builds competition/profile context from rules, metric, files, data shape, and constraints.
+- Planner: chooses the AutoKaggle phase, hypothesis, validation plan, and stop condition.
+- Developer: writes notebook code or notebook diffs for exactly the approved plan.
+- Reviewer: blocks weak plans, invalid submissions, leakage risks, metric mismatch, and repeated churn.
+- Summarizer: records durable lessons and phase reports.
+- Kaggle Triage: classifies remote notebook errors and routes back to Planner/Developer/Reviewer.
+- Scout: fetches raw competition candidates and discussion pointers before Reader starts.
 
 V0 can run these roles as prompts inside one coding-agent session. Separate subagents are useful for isolated review, live Kaggle checks, and long-context research, but the filesystem remains the shared blackboard.
+
+## Phase Records
+
+Each significant attempt should map to one AutoKaggle phase:
+
+```json
+{
+  "competition_slug": "example",
+  "phase": "feature_engineering",
+  "hypothesis": "Frequency encoding high-cardinality categoricals improves grouped CV.",
+  "status": "planned",
+  "plan_sha256": "...",
+  "notebook_sha256": "...",
+  "experiment_key": "..."
+}
+```
+
+Recommended phase values:
+
+```text
+background_understanding
+preliminary_eda
+data_cleaning
+in_depth_eda
+feature_engineering
+model_building_validation_prediction
+triage_fix
+submission_review
+```
+
+This keeps AutoKaggle's phase decomposition while preserving JSON as the agent-facing state.
 
 ## State Machine
 
@@ -42,6 +121,7 @@ V0 can run these roles as prompts inside one coding-agent session. Separate suba
 competition_discovered
 -> competition_profile_built
 -> baseline_planned
+-> experiment_registered
 -> local_smoke_test_passed
 -> notebook_generated
 -> notebook_pushed

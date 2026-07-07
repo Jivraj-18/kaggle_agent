@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,64 @@ def add_run(args: argparse.Namespace) -> None:
     emit(upsert_by_key("runs.json", "run_id", row), args.json)
 
 
+def file_sha256(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def experiment_key(row: dict[str, Any]) -> str:
+    payload = {
+        "competition_slug": row["competition_slug"],
+        "hypothesis": " ".join(row["hypothesis"].lower().split()),
+        "plan_sha256": row.get("plan_sha256"),
+        "notebook_sha256": row.get("notebook_sha256"),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def add_experiment(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    row = {
+        "experiment_id": args.experiment_id or f"{args.competition_slug}-{utc_now().replace(':', '').replace('-', '')}",
+        "competition_slug": args.competition_slug,
+        "phase": args.phase,
+        "hypothesis": args.hypothesis,
+        "plan_file": str(args.plan_file) if args.plan_file else None,
+        "notebook_file": str(args.notebook_file) if args.notebook_file else None,
+        "plan_sha256": file_sha256(args.plan_file),
+        "notebook_sha256": file_sha256(args.notebook_file),
+        "status": args.status,
+        "run_id": args.run_id,
+        "notes": args.notes or "",
+    }
+    row["experiment_key"] = args.experiment_key or experiment_key(row)
+    existing = next(
+        (item for item in read_list("experiments.json") if item.get("experiment_key") == row["experiment_key"]),
+        None,
+    )
+    if existing and not args.allow_duplicate:
+        raise SystemExit(
+            f"duplicate experiment: {existing.get('experiment_id')} already has key {row['experiment_key']}"
+        )
+    emit(upsert_by_key("experiments.json", "experiment_id", row), args.json)
+
+
+def list_experiments(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    rows = read_list("experiments.json")
+    if args.competition_slug:
+        rows = [row for row in rows if row.get("competition_slug") == args.competition_slug]
+    if args.status:
+        rows = [row for row in rows if row.get("status") == args.status]
+    emit(rows, args.json)
+
+
 def list_runs(args: argparse.Namespace) -> None:
     ensure_state_files()
     rows = read_list("runs.json")
@@ -129,13 +188,57 @@ def list_submissions(args: argparse.Namespace) -> None:
 def state_summary(args: argparse.Namespace) -> None:
     ensure_state_files()
     summary = {
+        "artifacts": len(read_json("artifacts.json", [])),
         "competitions": len(read_json("competitions.json", [])),
+        "experiments": len(read_json("experiments.json", [])),
+        "notebooks": len(read_json("notebooks.json", [])),
         "runs": len(read_json("runs.json", [])),
         "submissions": len(read_json("submissions.json", [])),
         "scout_snapshots": len(read_json("scout_history.json", [])),
         "tasks": len(read_json("tasks.json", [])),
     }
     emit(summary, args.json)
+
+
+def resume_context(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    terminal = {"COMPLETE", "ERROR", "FAILED", "CANCELED", "CANCELLED"}
+    runs = read_list("runs.json")
+    experiments = read_list("experiments.json")
+    pending_runs = [row for row in runs if str(row.get("status", "")).upper() not in terminal]
+    pending_experiments = [
+        row for row in experiments if str(row.get("status", "")).lower() not in {"complete", "submitted", "stopped"}
+    ]
+    context = {
+        "summary": {
+            "competitions": len(read_json("competitions.json", [])),
+            "experiments": len(experiments),
+            "pending_experiments": len(pending_experiments),
+            "runs": len(runs),
+            "pending_runs": len(pending_runs),
+            "submissions": len(read_json("submissions.json", [])),
+            "scout_snapshots": len(read_json("scout_history.json", [])),
+            "notebooks": len(read_json("notebooks.json", [])),
+            "artifacts": len(read_json("artifacts.json", [])),
+        },
+        "state_files": [
+            "state/competitions.json",
+            "state/experiments.json",
+            "state/runs.json",
+            "state/submissions.json",
+            "state/scout_history.json",
+            "state/notebooks.json",
+            "state/artifacts.json",
+            "state/lessons.md",
+        ],
+        "pending_runs": pending_runs,
+        "pending_experiments": pending_experiments,
+        "agent_instruction": (
+            "Use this as resume context only. For Kaggle updates, check pending_runs once and pull outputs only "
+            "for terminal runs. For new competitions, run scout-competitions and review raw rows with lessons."
+        ),
+    }
+    emit(context, args.json)
 
 
 def validate(args: argparse.Namespace) -> None:
@@ -212,6 +315,10 @@ def build_parser() -> argparse.ArgumentParser:
     summary.add_argument("--json", action="store_true")
     summary.set_defaults(func=state_summary)
 
+    resume = sub.add_parser("resume-context")
+    resume.add_argument("--json", action="store_true")
+    resume.set_defaults(func=resume_context)
+
     valid = sub.add_parser("validate-state")
     valid.add_argument("--json", action="store_true")
     valid.set_defaults(func=validate)
@@ -253,6 +360,28 @@ def build_parser() -> argparse.ArgumentParser:
     comp_list.add_argument("--decision")
     comp_list.add_argument("--json", action="store_true")
     comp_list.set_defaults(func=list_competitions)
+
+    experiments = sub.add_parser("experiments")
+    experiments_sub = experiments.add_subparsers(dest="experiment_command", required=True)
+    exp_add = experiments_sub.add_parser("add")
+    exp_add.add_argument("--experiment-id")
+    exp_add.add_argument("--competition-slug", required=True)
+    exp_add.add_argument("--phase", default="model_building_validation_prediction")
+    exp_add.add_argument("--hypothesis", required=True)
+    exp_add.add_argument("--plan-file", type=Path)
+    exp_add.add_argument("--notebook-file", type=Path)
+    exp_add.add_argument("--experiment-key")
+    exp_add.add_argument("--status", default="planned")
+    exp_add.add_argument("--run-id")
+    exp_add.add_argument("--notes")
+    exp_add.add_argument("--allow-duplicate", action="store_true")
+    exp_add.add_argument("--json", action="store_true")
+    exp_add.set_defaults(func=add_experiment)
+    exp_list = experiments_sub.add_parser("list")
+    exp_list.add_argument("--competition-slug")
+    exp_list.add_argument("--status")
+    exp_list.add_argument("--json", action="store_true")
+    exp_list.set_defaults(func=list_experiments)
 
     runs = sub.add_parser("runs")
     runs_sub = runs.add_subparsers(dest="run_command", required=True)

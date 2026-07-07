@@ -64,6 +64,9 @@ def validate_state() -> list[str]:
         "competitions.json",
         "runs.json",
         "submissions.json",
+        "experiments.json",
+        "notebooks.json",
+        "artifacts.json",
         "scout_history.json",
         "tasks.json",
     ]
@@ -86,6 +89,9 @@ def ensure_state_files() -> None:
         "competitions.json": [],
         "runs.json": [],
         "submissions.json": [],
+        "experiments.json": [],
+        "notebooks.json": [],
+        "artifacts.json": [],
         "scout_history.json": [],
         "tasks.json": [],
         "preferences.json": {
