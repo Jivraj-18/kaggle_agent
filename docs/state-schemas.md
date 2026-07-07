@@ -121,6 +121,26 @@ Use `sessions start` and `sessions end`; do not hand-edit JSONL.
 
 ## artifacts.json
 
+## notebooks.json
+
+Notebook files should live in Google Drive or Kaggle, not Git:
+
+```json
+{
+  "notebook_id": "owner/kernel:v1",
+  "competition_slug": "example",
+  "experiment_key": "sha256",
+  "kernel_slug": "owner/kernel",
+  "version": 1,
+  "drive_file_id": "google-drive-id",
+  "source_sha256": "sha256",
+  "status": "pushed",
+  "notes": ""
+}
+```
+
+Use `notebooks add/list` to track references.
+
 Kaggle outputs and pulled logs are recorded here:
 
 ```json

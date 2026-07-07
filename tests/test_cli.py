@@ -165,6 +165,38 @@ class CliTests(unittest.TestCase):
         self.assertIn('"experiment_key": "exp-key-1"', listing.stdout)
         self.assertIn('"kernel_slug": "user/demo-kernel"', listing.stdout)
 
+    def test_add_and_list_notebook_reference(self):
+        add = self.run_cli(
+            "notebooks",
+            "add",
+            "--notebook-id",
+            "nb-1",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "1",
+            "--drive-file-id",
+            "drive-123",
+            "--source-sha256",
+            "abc123",
+            "--status",
+            "pushed",
+            "--json",
+        )
+        self.assertEqual(add.returncode, 0, add.stderr)
+        body = json.loads(add.stdout)
+        self.assertEqual(body["drive_file_id"], "drive-123")
+        self.assertEqual(body["experiment_key"], "exp-key-1")
+
+        listing = self.run_cli("notebooks", "list", "--competition-slug", "demo-comp", "--json")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        rows = json.loads(listing.stdout)
+        self.assertEqual(rows[0]["kernel_slug"], "user/demo-kernel")
+
     def test_submission_records_experiment_lineage(self):
         add = self.run_cli(
             "submissions",

@@ -186,6 +186,32 @@ def list_runs(args: argparse.Namespace) -> None:
     emit(rows, args.json)
 
 
+def add_notebook(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    row = {
+        "notebook_id": args.notebook_id or f"{args.kernel_slug}:v{args.version or 'latest'}",
+        "competition_slug": args.competition_slug,
+        "experiment_key": args.experiment_key,
+        "kernel_slug": args.kernel_slug,
+        "version": args.version,
+        "drive_file_id": args.drive_file_id,
+        "source_sha256": args.source_sha256,
+        "status": args.status,
+        "notes": args.notes or "",
+    }
+    emit(upsert_by_key("notebooks.json", "notebook_id", row), args.json)
+
+
+def list_notebooks(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    rows = read_list("notebooks.json")
+    if args.competition_slug:
+        rows = [row for row in rows if row.get("competition_slug") == args.competition_slug]
+    if args.status:
+        rows = [row for row in rows if row.get("status") == args.status]
+    emit(rows, args.json)
+
+
 def check_run(args: argparse.Namespace) -> None:
     ensure_state_files()
     rows = read_list("runs.json")
@@ -659,6 +685,26 @@ def build_parser() -> argparse.ArgumentParser:
     exp_list.add_argument("--status")
     exp_list.add_argument("--json", action="store_true")
     exp_list.set_defaults(func=list_experiments)
+
+    notebooks = sub.add_parser("notebooks")
+    notebooks_sub = notebooks.add_subparsers(dest="notebook_command", required=True)
+    notebook_add = notebooks_sub.add_parser("add")
+    notebook_add.add_argument("--notebook-id")
+    notebook_add.add_argument("--competition-slug", required=True)
+    notebook_add.add_argument("--experiment-key")
+    notebook_add.add_argument("--kernel-slug", required=True)
+    notebook_add.add_argument("--version", type=int)
+    notebook_add.add_argument("--drive-file-id")
+    notebook_add.add_argument("--source-sha256")
+    notebook_add.add_argument("--status", default="created")
+    notebook_add.add_argument("--notes")
+    notebook_add.add_argument("--json", action="store_true")
+    notebook_add.set_defaults(func=add_notebook)
+    notebook_list = notebooks_sub.add_parser("list")
+    notebook_list.add_argument("--competition-slug")
+    notebook_list.add_argument("--status")
+    notebook_list.add_argument("--json", action="store_true")
+    notebook_list.set_defaults(func=list_notebooks)
 
     runs = sub.add_parser("runs")
     runs_sub = runs.add_subparsers(dest="run_command", required=True)

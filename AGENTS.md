@@ -47,6 +47,8 @@ Notebook files should not be committed to this repo. Track notebook identity and
 
 ## Architecture
 
+For the codebase graph and change targets, read `docs/codebase-map.md`.
+
 Personas live in `agents/`. Follow AutoKaggle's roles and phases, adapted for Kaggle remote compute:
 
 - Reader: understands competition rules, metric, data, constraints.
