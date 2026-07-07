@@ -57,7 +57,7 @@ flowchart TD
 
 - New CLI command: edit `kaggle_agent/cli.py`, add tests in `tests/test_cli.py`.
 - New state file/default: edit `kaggle_agent/state.py`, update `docs/state-schemas.md`.
-- Kaggle CLI behavior: edit `kaggle_agent/kaggle_cli.py`; keep wrappers thin.
+- Kaggle CLI behavior: edit `kaggle_agent/kaggle_cli.py`; keep wrappers thin. Every unit/CLI test stubs `uvx kaggle` with hand-written JSON, so they can only prove "our code handles the shape we assumed," never that the shape is real. Before and after changing anything that parses Kaggle CLI stdout, run `KAGGLE_AGENT_LIVE_TESTS=1 uv run pytest tests/test_live_kaggle_api.py -v` (read-only, needs `~/.kaggle/credentials.json`) to check against the real API. This is how the pagination-banner bug in `parse_json_output` was found.
 - Google Drive behavior: edit `kaggle_agent/drive_sync.py` or `kaggle_agent/gws_cli.py`.
 - Output/log/submission artifact behavior: edit `kaggle_agent/artifacts.py`.
 - Competition scouting shape: edit `kaggle_agent/scout.py`.
