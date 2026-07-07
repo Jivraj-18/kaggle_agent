@@ -141,6 +141,12 @@ Notebook files should live in Google Drive or Kaggle, not Git:
 
 Use `notebooks add/list` to track references.
 
+Before pushing a Kaggle notebook, validate metadata:
+
+```bash
+python -m kaggle_agent.cli notebooks validate-metadata <kernel-metadata.json> --competition-slug <slug> --json
+```
+
 ## tasks.json
 
 Use tasks for explicit cross-session handoff:

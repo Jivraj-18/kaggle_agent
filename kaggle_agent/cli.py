@@ -212,6 +212,21 @@ def list_notebooks(args: argparse.Namespace) -> None:
     emit(rows, args.json)
 
 
+def validate_notebook_metadata(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    metadata = json.loads(args.metadata_file.read_text(encoding="utf-8"))
+    profile = next((row for row in read_list("profiles.json") if row.get("competition_slug") == args.competition_slug), {})
+    errors: list[str] = []
+    if args.competition_slug not in (metadata.get("competition_sources") or []):
+        errors.append(f"competition_sources: missing {args.competition_slug}")
+    if profile.get("internet_allowed") is False and metadata.get("enable_internet") is True:
+        errors.append("enable_internet: profile forbids internet")
+    result = {"ok": not errors, "errors": errors}
+    emit(result, args.json)
+    if errors:
+        raise SystemExit(1)
+
+
 def add_task(args: argparse.Namespace) -> None:
     ensure_state_files()
     row = {
@@ -740,6 +755,11 @@ def build_parser() -> argparse.ArgumentParser:
     notebook_list.add_argument("--status")
     notebook_list.add_argument("--json", action="store_true")
     notebook_list.set_defaults(func=list_notebooks)
+    notebook_validate = notebooks_sub.add_parser("validate-metadata")
+    notebook_validate.add_argument("metadata_file", type=Path)
+    notebook_validate.add_argument("--competition-slug", required=True)
+    notebook_validate.add_argument("--json", action="store_true")
+    notebook_validate.set_defaults(func=validate_notebook_metadata)
 
     tasks = sub.add_parser("tasks")
     tasks_sub = tasks.add_subparsers(dest="task_command", required=True)

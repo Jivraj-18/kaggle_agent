@@ -200,6 +200,60 @@ class CliTests(unittest.TestCase):
         rows = json.loads(listing.stdout)
         self.assertEqual(rows[0]["kernel_slug"], "user/demo-kernel")
 
+    def test_validate_notebook_metadata_against_profile(self):
+        self.run_cli(
+            "profiles",
+            "add",
+            "demo-comp",
+            "--internet-allowed",
+            "false",
+            "--json",
+        )
+        metadata = Path(self.tmp.name) / "kernel-metadata.json"
+        metadata.write_text(
+            json.dumps(
+                {
+                    "id": "user/demo-kernel",
+                    "competition_sources": ["demo-comp"],
+                    "enable_internet": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        valid = self.run_cli(
+            "notebooks",
+            "validate-metadata",
+            str(metadata),
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+        )
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+        self.assertTrue(json.loads(valid.stdout)["ok"])
+
+        metadata.write_text(
+            json.dumps(
+                {
+                    "id": "user/demo-kernel",
+                    "competition_sources": ["other-comp"],
+                    "enable_internet": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+        invalid = self.run_cli(
+            "notebooks",
+            "validate-metadata",
+            str(metadata),
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+        )
+        self.assertEqual(invalid.returncode, 1)
+        body = json.loads(invalid.stdout)
+        self.assertIn("competition_sources: missing demo-comp", body["errors"])
+        self.assertIn("enable_internet: profile forbids internet", body["errors"])
+
     def test_add_list_and_complete_task(self):
         add = self.run_cli(
             "tasks",

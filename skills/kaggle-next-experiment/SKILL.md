@@ -34,6 +34,10 @@ description: Plan, improve, or continue a Kaggle competition. Use for requests l
      --notes "<reason>"
    ```
 7. Reviewer must approve before Kaggle push.
-8. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+8. Validate notebook metadata before push:
+   ```bash
+   python -m kaggle_agent.cli notebooks validate-metadata <kernel-metadata.json> --competition-slug <slug> --json
+   ```
+9. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not push notebooks or submit if Reviewer says `revise`, `stop`, or `escalate`.
