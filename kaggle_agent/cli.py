@@ -625,6 +625,9 @@ def recompute_metrics(args: argparse.Namespace) -> None:
                 "valid_submissions": 0,
                 "best_public_score": None,
                 "families": {},
+                "sessions": 0,
+                "tokens": {"input": 0, "output": 0, "cache_read": 0},
+                "estimated_cost_usd": 0,
             },
         )
 
@@ -648,6 +651,17 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         score = row.get("public_score")
         if score is not None and (data["best_public_score"] is None or score > data["best_public_score"]):
             data["best_public_score"] = score
+
+    for row in sessions:
+        if not row.get("competition_slug"):
+            continue
+        data = bucket(row.get("competition_slug"))
+        tokens = row.get("tokens") or {}
+        data["sessions"] += 1
+        data["tokens"]["input"] += tokens.get("input") or 0
+        data["tokens"]["output"] += tokens.get("output") or 0
+        data["tokens"]["cache_read"] += tokens.get("cache_read") or 0
+        data["estimated_cost_usd"] += row.get("estimated_cost_usd") or 0
 
     metrics = {
         "generated_at": utc_now(),

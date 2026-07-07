@@ -574,7 +574,17 @@ print("Successfully submitted to competition")
             "0.8",
             "--valid",
         )
-        start = self.run_cli("sessions", "start", "--harness", "codex", "--skill", "kaggle-next-experiment", "--json")
+        start = self.run_cli(
+            "sessions",
+            "start",
+            "--harness",
+            "codex",
+            "--skill",
+            "kaggle-next-experiment",
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+        )
         session_id = json.loads(start.stdout)["session_id"]
         self.run_cli(
             "sessions",
@@ -595,6 +605,8 @@ print("Successfully submitted to competition")
         self.assertEqual(body["competitions"]["demo-comp"]["experiments"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["runs"], 1)
         self.assertEqual(body["competitions"]["demo-comp"]["failed_runs"], 1)
+        self.assertEqual(body["competitions"]["demo-comp"]["sessions"], 1)
+        self.assertEqual(body["competitions"]["demo-comp"]["tokens"]["input"], 100)
         self.assertEqual(body["sessions"]["total_input_tokens"], 100)
 
     def test_experiment_duplicate_is_blocked(self):
