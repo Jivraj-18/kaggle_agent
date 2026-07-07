@@ -9,6 +9,7 @@ from .artifacts import find_output_artifact, find_run, record_output_artifact, r
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
 from .kaggle_cli import (
+    competition_submissions,
     competition_submit,
     kernel_output,
     kernel_push,
@@ -475,6 +476,50 @@ def submit_file(args: argparse.Namespace) -> None:
             {"submitted": True, "next_action": "check_leaderboard"},
         )
     emit({"submission": submission, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
+
+
+def maybe_float(value: Any) -> float | None:
+    if value in {None, ""}:
+        return None
+    return float(value)
+
+
+def refresh_submissions(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    result = competition_submissions(args.competition_slug)
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+
+    raw_rows = json.loads(result.stdout or "[]")
+    existing = {row.get("submission_ref"): row for row in read_list("submissions.json")}
+    refreshed = []
+    for idx, raw in enumerate(raw_rows):
+        ref = str(raw.get("ref") or raw.get("id") or raw.get("submissionId") or f"{args.competition_slug}:{idx}")
+        previous = existing.get(ref, {})
+        row = {
+            "submission_ref": ref,
+            "competition_slug": args.competition_slug,
+            "experiment_key": previous.get("experiment_key"),
+            "kernel_slug": previous.get("kernel_slug"),
+            "version": previous.get("version"),
+            "file_name": raw.get("fileName") or previous.get("file_name"),
+            "status": raw.get("status") or previous.get("status"),
+            "public_score": maybe_float(raw.get("publicScore")),
+            "private_score": maybe_float(raw.get("privateScore")),
+            "valid": str(raw.get("status", "")).lower() in {"complete", "completed", "submitted"},
+            "raw": raw,
+        }
+        refreshed.append(upsert_by_key("submissions.json", "submission_ref", row))
+    emit(refreshed, args.json)
 
 
 def list_submissions(args: argparse.Namespace) -> None:
@@ -1062,6 +1107,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub_submit.add_argument("--version", type=int)
     sub_submit.add_argument("--json", action="store_true")
     sub_submit.set_defaults(func=submit_file)
+    sub_refresh = submissions_sub.add_parser("refresh")
+    sub_refresh.add_argument("--competition-slug", required=True)
+    sub_refresh.add_argument("--json", action="store_true")
+    sub_refresh.set_defaults(func=refresh_submissions)
 
     return parser
 

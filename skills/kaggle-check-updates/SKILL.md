@@ -39,10 +39,14 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
      --version <version> \
      --json
    ```
-7. Update lessons and sync state:
+7. If a prior run has `next_action: check_leaderboard`, refresh Kaggle submission scores:
+   ```bash
+   python -m kaggle_agent.cli submissions refresh --competition-slug <slug> --json
+   ```
+8. Update lessons and sync state:
    ```bash
    python -m kaggle_agent.cli drive-sync push --root state --json
    ```
-8. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
+9. End the session with `python -m kaggle_agent.cli sessions end <session-id> ... --json`.
 
 Do not continuously poll. Check once per user-triggered session unless the user explicitly asks otherwise.

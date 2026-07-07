@@ -490,6 +490,53 @@ print("Successfully submitted to competition")
         self.assertTrue(runs[0]["submitted"])
         self.assertEqual(runs[0]["next_action"], "check_leaderboard")
 
+    def test_refresh_submissions_updates_scores_from_kaggle(self):
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--json",
+        )
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+print(json.dumps([{"ref": "sub-1", "fileName": "submission.csv", "status": "complete", "publicScore": "0.7"}]))
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        refreshed = self.run_cli(
+            "submissions",
+            "refresh",
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(refreshed.returncode, 0, refreshed.stderr)
+        rows = json.loads(refreshed.stdout)
+        self.assertEqual(rows[0]["public_score"], 0.7)
+        self.assertEqual(rows[0]["experiment_key"], "exp-key-1")
+        call = json.loads(calls.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(
+            call,
+            ["kaggle", "competitions", "submissions", "demo-comp", "--format", "json", "--page-size", "200"],
+        )
+
     def test_pull_output_from_directory_records_artifact_and_updates_run(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"
         output_dir.mkdir()
