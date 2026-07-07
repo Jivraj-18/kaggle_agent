@@ -35,6 +35,32 @@ class StateTests(unittest.TestCase):
         self.assertEqual(rows[0]["title"], "New")
         self.assertEqual(first["created_at"], second["created_at"])
 
+    def test_validate_state_checks_known_enums(self):
+        self.state.ensure_state_files()
+        (Path(self.tmp.name) / "profiles.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "competition_slug": "demo",
+                        "metric_direction": "sideways",
+                    }
+                ]
+            )
+        )
+        (Path(self.tmp.name) / "runs.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "run_id": "run-1",
+                        "failure_class": "mystery",
+                    }
+                ]
+            )
+        )
+        errors = self.state.validate_state()
+        self.assertIn("profiles.json[0].metric_direction: expected one of maximize, minimize", errors)
+        self.assertIn("runs.json[0].failure_class: unknown failure class mystery", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

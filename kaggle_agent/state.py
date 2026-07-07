@@ -6,6 +6,21 @@ from typing import Any
 from .config import STATE_DIR
 
 
+FAILURE_CLASSES = {
+    "transient_cli",
+    "environment",
+    "missing_file",
+    "schema",
+    "code",
+    "oom",
+    "timeout",
+    "quota",
+    "metric_mismatch",
+    "rule_risk",
+    "unknown",
+}
+
+
 def read_json(name: str, default: Any) -> Any:
     path = STATE_DIR / name
     if not path.exists():
@@ -90,6 +105,14 @@ def validate_state() -> list[str]:
     prefs = read_json("preferences.json", {})
     if not isinstance(prefs, dict):
         errors.append("preferences.json: expected object")
+    for idx, row in enumerate(read_json("profiles.json", [])):
+        direction = row.get("metric_direction")
+        if direction is not None and direction not in {"maximize", "minimize"}:
+            errors.append(f"profiles.json[{idx}].metric_direction: expected one of maximize, minimize")
+    for idx, row in enumerate(read_json("runs.json", [])):
+        failure_class = row.get("failure_class")
+        if failure_class is not None and failure_class not in FAILURE_CLASSES:
+            errors.append(f"runs.json[{idx}].failure_class: unknown failure class {failure_class}")
     return errors
 
 
