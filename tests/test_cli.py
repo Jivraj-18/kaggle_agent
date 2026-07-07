@@ -919,6 +919,8 @@ print({output_json!r})
             "health-comp",
             "--public-score",
             "0.5",
+            "--percentile",
+            "0.8",
             "--valid",
             "--json",
         )
@@ -956,6 +958,8 @@ print({output_json!r})
         self.assertEqual(data["cost_per_valid_submission"], 1.0)
         self.assertIsNotNone(data["days_to_first_valid_submission"])
         self.assertGreaterEqual(data["days_to_first_valid_submission"], 0.0)
+        self.assertEqual(data["best_percentile"], 0.8)
+        self.assertAlmostEqual(data["cost_per_percentile_point"], 1.0 / 80)
 
     def test_metrics_recompute_leaves_derived_metrics_null_without_data(self):
         self.run_cli(
@@ -974,6 +978,8 @@ print({output_json!r})
         self.assertIsNone(data["failed_run_rate"])
         self.assertIsNone(data["cost_per_valid_submission"])
         self.assertIsNone(data["days_to_first_valid_submission"])
+        self.assertIsNone(data["best_percentile"])
+        self.assertIsNone(data["cost_per_percentile_point"])
 
     def test_experiment_duplicate_is_blocked(self):
         plan = Path(self.tmp.name) / "plan.md"

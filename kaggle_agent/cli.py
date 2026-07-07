@@ -784,6 +784,8 @@ def recompute_metrics(args: argparse.Namespace) -> None:
                 "failed_run_rate": None,
                 "cost_per_valid_submission": None,
                 "days_to_first_valid_submission": None,
+                "best_percentile": None,
+                "cost_per_percentile_point": None,
             },
         )
 
@@ -831,6 +833,9 @@ def recompute_metrics(args: argparse.Namespace) -> None:
             or (data.get("metric_direction") != "minimize" and score > data["best_public_score"])
         ):
             data["best_public_score"] = score
+        percentile = row.get("percentile")
+        if percentile is not None and (data["best_percentile"] is None or percentile > data["best_percentile"]):
+            data["best_percentile"] = percentile
 
     for row in sessions:
         if not row.get("competition_slug"):
@@ -853,6 +858,8 @@ def recompute_metrics(args: argparse.Namespace) -> None:
         first_valid_time = first_valid_submission_at.get(slug)
         if join_time is not None and first_valid_time is not None:
             data["days_to_first_valid_submission"] = (first_valid_time - join_time).total_seconds() / 86400
+        if data["best_percentile"]:
+            data["cost_per_percentile_point"] = data["estimated_cost_usd"] / (data["best_percentile"] * 100)
 
     metrics = {
         "generated_at": utc_now(),
