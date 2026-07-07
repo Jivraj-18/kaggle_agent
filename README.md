@@ -31,7 +31,8 @@ Future commands:
 - Do not continuously poll Kaggle unless the user explicitly asks.
 - Prefer notebook-output submissions when competition rules care about notebook origin.
 - Keep credentials out of git.
-- Keep generated competition data and large artifacts out of git by default.
+- Keep `state/`, generated competition data, and large artifacts out of git by default.
+- Archive durable state/data/artifacts in Google Drive when they need to survive beyond this machine. See [docs/google-drive.md](docs/google-drive.md).
 - Record why each experiment was attempted, not only the score.
 - Keep deterministic code limited to fetching, validation, indexing, and persistence. Competition selection is a coding-agent decision.
 
