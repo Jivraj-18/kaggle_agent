@@ -3,9 +3,27 @@ import json
 import re
 import subprocess
 from dataclasses import dataclass
+from typing import Any
 
 
 STATUS_RE = re.compile(r'status "([^"]+)"')
+
+
+def parse_json_output(stdout: str, default: Any) -> Any:
+    """Parse JSON from Kaggle CLI stdout, skipping any plain-text preamble.
+
+    Paginated `--format json` output (e.g. `competitions leaderboard --show`)
+    prints a "Next Page Token = ..." banner line on stdout before the JSON
+    payload when more results exist than fit in one page. Plain json.loads
+    chokes on that; find the first `[` or `{` and parse from there instead.
+    """
+    text = stdout.strip()
+    if not text:
+        return default
+    starts = [idx for idx in (text.find("["), text.find("{")) if idx != -1]
+    if not starts:
+        return default
+    return json.loads(text[min(starts):])
 
 
 @dataclass(frozen=True)
@@ -81,7 +99,4 @@ def list_competitions(group: str, page_size: int = 100, search: str | None = Non
     result = run_kaggle(args)
     if result.returncode != 0:
         return [], result
-    text = result.stdout.strip()
-    if not text or text == "No competitions found":
-        return [], result
-    return json.loads(text), result
+    return parse_json_output(result.stdout, default=[]), result

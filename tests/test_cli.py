@@ -635,7 +635,12 @@ print({output_json!r})
                 {"teamName": "third-team", "score": "0.5"},
             ]
         )
-        _, env_overrides = self.stub_uvx(leaderboard)
+        # Real `kaggle competitions leaderboard --show --format json` prints this
+        # banner on stdout before the JSON array when more pages exist; verified
+        # against the live API. Stubbing the clean-JSON case only would have hidden
+        # the bug this shape triggers.
+        stdout_with_pagination_banner = f"Next Page Token = CfDJ8EgiEKLz2SFK\n{leaderboard}"
+        _, env_overrides = self.stub_uvx(stdout_with_pagination_banner)
 
         result = self.run_cli(
             "submissions",

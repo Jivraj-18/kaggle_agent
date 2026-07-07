@@ -17,6 +17,7 @@ from .kaggle_cli import (
     kernel_push,
     kernel_status,
     list_competitions as kaggle_list_competitions,
+    parse_json_output,
 )
 from .scout import build_scout_item
 from .token_usage import parse_claude_transcript
@@ -504,7 +505,7 @@ def refresh_submissions(args: argparse.Namespace) -> None:
         )
         raise SystemExit(result.returncode)
 
-    raw_rows = json.loads(result.stdout or "[]")
+    raw_rows = parse_json_output(result.stdout, default=[])
     existing = {row.get("submission_ref"): row for row in read_list("submissions.json")}
     refreshed = []
     for idx, raw in enumerate(raw_rows):
@@ -554,7 +555,7 @@ def refresh_leaderboard_rank(args: argparse.Namespace) -> None:
         )
         raise SystemExit(result.returncode)
 
-    rows = json.loads(result.stdout or "[]")
+    rows = parse_json_output(result.stdout, default=[])
     team_name = team_name.strip().lower()
     match_idx = next(
         (idx for idx, row in enumerate(rows) if str(row.get("teamName", "")).strip().lower() == team_name),
