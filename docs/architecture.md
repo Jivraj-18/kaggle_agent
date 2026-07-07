@@ -23,6 +23,10 @@ AutoKaggle's useful core is not its exact runtime. Its useful core is the discip
 5. feature engineering;
 6. model building, validation, and prediction.
 
+What this repo copies from AutoKaggle: the six phases above; the five roles (Reader, Planner, Developer, Reviewer, Summarizer); Reviewer feedback before phase completion; bounded debugging loops; unit-test style gates for data, validation, and submission artifacts; durable reports after each phase.
+
+What this repo does not copy: synchronous local execution for heavy ML; the assumption that failures return immediately from a Python interpreter; tabular-only tools as the whole system boundary; in-memory state.
+
 AutoKaggle runs synchronously in a local Python interpreter. This repo cannot copy that directly because Kaggle notebooks run remotely and asynchronously. The adaptation is:
 
 - every phase becomes an experiment record in JSON state;
@@ -61,6 +65,15 @@ uv run python -m kaggle_agent.cli experiments add \
 ```
 
 The CLI computes an `experiment_key` from competition slug, normalized hypothesis, plan file hash, and notebook file hash. If that key already exists, the command fails with `duplicate experiment`. This is an indexing guard, not an ML decision-maker: the coding agent still decides whether a similar-but-not-identical experiment is worthwhile.
+
+The guard only blocks exact repeats. The Reviewer must also block semantic repeats:
+
+- same model with only prompt wording changed;
+- same validation split under a new experiment name;
+- same feature family without a new reason;
+- rerun after failure without addressing the failure.
+
+Intentional reruns need `--allow-duplicate` and a clear note explaining why the rerun is useful.
 
 Before planning new work, future agents must read:
 
