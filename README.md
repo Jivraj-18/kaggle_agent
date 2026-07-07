@@ -12,23 +12,27 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 4. Feed raw Kaggle context and local history to the coding agent for decisions.
 5. Use Kaggle as remote compute, not as the source of long-term agent memory.
 
-## Main commands to build
+## Main commands
 
 - `kaggle-agent state-summary`: summarize local state.
 - `kaggle-agent resume-context`: first command for future coding-agent sessions.
-- `kaggle-agent sessions start/end/list`: record session observability and token/cost metadata.
-- `kaggle-agent metrics recompute`: regenerate observability roll-ups.
+- `kaggle-agent sessions start/end/list`: record session observability and token/cost metadata. `sessions end --transcript-file <path>` parses real usage from a Claude Code transcript instead of self-reporting.
+- `kaggle-agent metrics recompute`: regenerate observability roll-ups, including derived health metrics (`failed_run_rate`, `cost_per_valid_submission`, `days_to_first_valid_submission`, `best_percentile`, `cost_per_percentile_point`).
 - `kaggle-agent validate-state`: validate state file shapes.
 - `kaggle-agent competitions add/list`: record competitions under consideration or joined.
-- `kaggle-agent profiles add/list`: record Reader-extracted competition facts.
+- `kaggle-agent profiles add/list`: record Reader-extracted competition facts, including `--team-name` for leaderboard lookups.
 - `kaggle-agent notebooks add/list/push`: record notebook references without committing notebook files, and push approved notebooks to Kaggle.
 - `kaggle-agent notebooks validate-metadata`: check Kaggle metadata before push.
 - `kaggle-agent tasks add/list/complete`: record cross-session next actions.
 - `kaggle-agent runs add/list/check/pull-output/review-output`: record Kaggle notebook runs, check one run on demand, and review outputs.
-- `kaggle-agent submissions add/list/submit-file/refresh`: submit reviewed CSV files and record submitted files/scores.
+- `kaggle-agent submissions add/list/submit-file/refresh/refresh-leaderboard`: submit reviewed CSV files, record submitted files/scores, and populate leaderboard rank/percentile.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.
 - `kaggle-agent experiments add/list`: record planned heavy experiments before notebook push and block exact repeats.
 - `kaggle-agent drive-sync push`: copy changed local state/data files to Google Drive without deleting history.
+
+## Testing
+
+`uv run pytest` runs the default suite (offline, stubs every Kaggle/Drive CLI call). It structurally can only prove "our code handles the response shape we assumed" — not that the shape is real. Two opt-in suites hit the real APIs read-only (or dry-run for writes) to catch drift from that assumption: `KAGGLE_AGENT_LIVE_TESTS=1 uv run pytest tests/test_live_kaggle_api.py tests/test_live_gws_api.py -v`. Run them before/after touching `kaggle_cli.py` or `gws_cli.py`; see `docs/codebase-map.md`.
 
 ## Design rules
 
