@@ -212,6 +212,37 @@ def list_notebooks(args: argparse.Namespace) -> None:
     emit(rows, args.json)
 
 
+def add_task(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    row = {
+        "task_id": args.task_id or f"{args.kind}-{utc_now().replace(':', '').replace('-', '')}",
+        "competition_slug": args.competition_slug,
+        "kind": args.kind,
+        "priority": args.priority,
+        "status": "open",
+        "notes": args.notes or "",
+    }
+    emit(upsert_by_key("tasks.json", "task_id", row), args.json)
+
+
+def list_tasks(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    rows = read_list("tasks.json")
+    if args.status:
+        rows = [row for row in rows if row.get("status") == args.status]
+    if args.competition_slug:
+        rows = [row for row in rows if row.get("competition_slug") == args.competition_slug]
+    emit(rows, args.json)
+
+
+def complete_task(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    updated = update_matching("tasks.json", lambda row: row.get("task_id") == args.task_id, {"status": "complete"})
+    if not updated:
+        raise SystemExit(f"task not found: {args.task_id}")
+    emit(updated, args.json)
+
+
 def check_run(args: argparse.Namespace) -> None:
     ensure_state_files()
     rows = read_list("runs.json")
@@ -705,6 +736,26 @@ def build_parser() -> argparse.ArgumentParser:
     notebook_list.add_argument("--status")
     notebook_list.add_argument("--json", action="store_true")
     notebook_list.set_defaults(func=list_notebooks)
+
+    tasks = sub.add_parser("tasks")
+    tasks_sub = tasks.add_subparsers(dest="task_command", required=True)
+    task_add = tasks_sub.add_parser("add")
+    task_add.add_argument("--task-id")
+    task_add.add_argument("--competition-slug")
+    task_add.add_argument("--kind", required=True)
+    task_add.add_argument("--priority", default="normal")
+    task_add.add_argument("--notes")
+    task_add.add_argument("--json", action="store_true")
+    task_add.set_defaults(func=add_task)
+    task_list = tasks_sub.add_parser("list")
+    task_list.add_argument("--competition-slug")
+    task_list.add_argument("--status")
+    task_list.add_argument("--json", action="store_true")
+    task_list.set_defaults(func=list_tasks)
+    task_complete = tasks_sub.add_parser("complete")
+    task_complete.add_argument("task_id")
+    task_complete.add_argument("--json", action="store_true")
+    task_complete.set_defaults(func=complete_task)
 
     runs = sub.add_parser("runs")
     runs_sub = runs.add_subparsers(dest="run_command", required=True)

@@ -197,6 +197,34 @@ class CliTests(unittest.TestCase):
         rows = json.loads(listing.stdout)
         self.assertEqual(rows[0]["kernel_slug"], "user/demo-kernel")
 
+    def test_add_list_and_complete_task(self):
+        add = self.run_cli(
+            "tasks",
+            "add",
+            "--task-id",
+            "task-1",
+            "--competition-slug",
+            "demo-comp",
+            "--kind",
+            "review_outputs",
+            "--priority",
+            "high",
+            "--notes",
+            "Review pulled submission.",
+            "--json",
+        )
+        self.assertEqual(add.returncode, 0, add.stderr)
+        task = json.loads(add.stdout)
+        self.assertEqual(task["status"], "open")
+
+        listing = self.run_cli("tasks", "list", "--status", "open", "--json")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        self.assertIn("review_outputs", listing.stdout)
+
+        done = self.run_cli("tasks", "complete", "task-1", "--json")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["status"], "complete")
+
     def test_submission_records_experiment_lineage(self):
         add = self.run_cli(
             "submissions",

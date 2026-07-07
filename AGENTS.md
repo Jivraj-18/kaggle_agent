@@ -37,6 +37,8 @@ JSON state is canonical in v0:
 
 Do not commit `state/`.
 
+Use `tasks add/list/complete` to leave explicit next actions for future sessions.
+
 ## Storage Rule
 
 Code, tests, docs, templates, and skills live in Git.

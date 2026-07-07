@@ -141,6 +141,23 @@ Notebook files should live in Google Drive or Kaggle, not Git:
 
 Use `notebooks add/list` to track references.
 
+## tasks.json
+
+Use tasks for explicit cross-session handoff:
+
+```json
+{
+  "task_id": "task-1",
+  "competition_slug": "example",
+  "kind": "review_outputs",
+  "priority": "high",
+  "status": "open",
+  "notes": "Review pulled submission."
+}
+```
+
+Use `tasks add/list/complete`.
+
 Kaggle outputs and pulled logs are recorded here:
 
 ```json
