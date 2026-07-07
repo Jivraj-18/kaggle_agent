@@ -59,6 +59,12 @@ def competition_submissions(competition_slug: str) -> CommandResult:
     return run_kaggle(["competitions", "submissions", competition_slug, "--format", "json", "--page-size", "200"])
 
 
+def competition_leaderboard(competition_slug: str, page_size: int = 200) -> CommandResult:
+    return run_kaggle(
+        ["competitions", "leaderboard", competition_slug, "--show", "--format", "json", "--page-size", str(page_size)]
+    )
+
+
 def list_competitions(group: str, page_size: int = 100, search: str | None = None) -> tuple[list[dict], CommandResult]:
     args = [
         "competitions",

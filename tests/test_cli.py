@@ -592,6 +592,90 @@ print(json.dumps([{"ref": "sub-1", "fileName": "submission.csv", "status": "comp
             ["kaggle", "competitions", "submissions", "demo-comp", "--format", "json", "--page-size", "200"],
         )
 
+    def stub_uvx(self, output_json: str) -> tuple[Path, dict]:
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            f"""#!/usr/bin/env python3
+import json
+import os
+import sys
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+print({output_json!r})
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+        return bin_dir, {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)}
+
+    def test_refresh_leaderboard_updates_matching_submission_rank(self):
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--experiment-key",
+            "exp-key-1",
+            "--public-score",
+            "0.7",
+            "--json",
+        )
+        leaderboard = json.dumps(
+            [
+                {"teamName": "top-team", "score": "0.9"},
+                {"teamName": "my-team", "score": "0.7"},
+                {"teamName": "third-team", "score": "0.5"},
+            ]
+        )
+        _, env_overrides = self.stub_uvx(leaderboard)
+
+        result = self.run_cli(
+            "submissions",
+            "refresh-leaderboard",
+            "--competition-slug",
+            "demo-comp",
+            "--team-name",
+            "my-team",
+            "--json",
+            env_overrides=env_overrides,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = json.loads(result.stdout)
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["rank"], 2)
+        self.assertAlmostEqual(body["percentile"], 1 - (2 - 1) / 3)
+        self.assertEqual(body["updated_submission"]["submission_ref"], "sub-1")
+        self.assertEqual(body["updated_submission"]["rank"], 2)
+
+        listed = self.run_cli("submissions", "list", "--json")
+        rows = json.loads(listed.stdout)
+        self.assertEqual(rows[0]["rank"], 2)
+        self.assertAlmostEqual(rows[0]["percentile"], 1 - (2 - 1) / 3)
+
+    def test_refresh_leaderboard_team_not_found_is_reported_not_crashed(self):
+        leaderboard = json.dumps([{"teamName": "someone-else", "score": "0.9"}])
+        _, env_overrides = self.stub_uvx(leaderboard)
+
+        result = self.run_cli(
+            "submissions",
+            "refresh-leaderboard",
+            "--competition-slug",
+            "demo-comp",
+            "--team-name",
+            "my-team",
+            "--json",
+            env_overrides=env_overrides,
+        )
+        self.assertEqual(result.returncode, 1)
+        body = json.loads(result.stdout)
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["reason"], "team_not_found_in_fetched_page")
+
     def test_pull_output_from_directory_records_artifact_and_updates_run(self):
         output_dir = Path(self.tmp.name) / "kaggle-output"
         output_dir.mkdir()

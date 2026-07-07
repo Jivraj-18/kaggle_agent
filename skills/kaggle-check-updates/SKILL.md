@@ -39,10 +39,12 @@ description: Check pending Kaggle notebook runs, inspect submitted work, pull fi
      --version <version> \
      --json
    ```
-7. If a prior run has `next_action: check_leaderboard`, refresh Kaggle submission scores:
+7. If a prior run has `next_action: check_leaderboard`, refresh Kaggle submission scores, then rank if the team name is known:
    ```bash
    uv run python -m kaggle_agent.cli submissions refresh --competition-slug <slug> --json
+   uv run python -m kaggle_agent.cli submissions refresh-leaderboard --competition-slug <slug> --team-name <kaggle-team-name> --json
    ```
+   Ask the user for `--team-name` if it is not already known; it is not stored in state.
 8. Update lessons and sync state:
    ```bash
    uv run python -m kaggle_agent.cli drive-sync push --root state --json

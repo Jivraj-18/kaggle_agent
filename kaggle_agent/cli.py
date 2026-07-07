@@ -10,6 +10,7 @@ from .artifacts import find_output_artifact, find_run, record_output_artifact, r
 from .config import PROJECT_ROOT, STATE_DIR
 from .drive_sync import push_roots
 from .kaggle_cli import (
+    competition_leaderboard,
     competition_submissions,
     competition_submit,
     kernel_output,
@@ -523,6 +524,53 @@ def refresh_submissions(args: argparse.Namespace) -> None:
         }
         refreshed.append(upsert_by_key("submissions.json", "submission_ref", row))
     emit(refreshed, args.json)
+
+
+def refresh_leaderboard_rank(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    result = competition_leaderboard(args.competition_slug, page_size=args.page_size)
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+
+    rows = json.loads(result.stdout or "[]")
+    team_name = args.team_name.strip().lower()
+    match_idx = next(
+        (idx for idx, row in enumerate(rows) if str(row.get("teamName", "")).strip().lower() == team_name),
+        None,
+    )
+    if match_idx is None:
+        emit({"ok": False, "reason": "team_not_found_in_fetched_page", "checked_rows": len(rows)}, args.json)
+        raise SystemExit(1)
+
+    rank = match_idx + 1
+    total = len(rows)
+    percentile = (1 - (rank - 1) / total) if total > 0 else None
+    score = maybe_float(rows[match_idx].get("score"))
+    updated = update_matching(
+        "submissions.json",
+        lambda row: row.get("competition_slug") == args.competition_slug and maybe_float(row.get("public_score")) == score,
+        {"rank": rank, "percentile": percentile},
+    )
+    emit(
+        {
+            "ok": True,
+            "rank": rank,
+            "percentile": percentile,
+            "total_teams_checked": total,
+            "matched_score": score,
+            "updated_submission": updated,
+        },
+        args.json,
+    )
 
 
 def list_submissions(args: argparse.Namespace) -> None:
@@ -1154,6 +1202,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub_refresh.add_argument("--competition-slug", required=True)
     sub_refresh.add_argument("--json", action="store_true")
     sub_refresh.set_defaults(func=refresh_submissions)
+
+    sub_refresh_leaderboard = submissions_sub.add_parser("refresh-leaderboard")
+    sub_refresh_leaderboard.add_argument("--competition-slug", required=True)
+    sub_refresh_leaderboard.add_argument("--team-name", required=True)
+    sub_refresh_leaderboard.add_argument("--page-size", type=int, default=200)
+    sub_refresh_leaderboard.add_argument("--json", action="store_true")
+    sub_refresh_leaderboard.set_defaults(func=refresh_leaderboard_rank)
 
     return parser
 
