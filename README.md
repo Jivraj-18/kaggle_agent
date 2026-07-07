@@ -20,6 +20,7 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent runs add/list/check`: record Kaggle notebook runs and check one run on demand.
 - `kaggle-agent submissions add/list`: record submitted files and scores.
 - `kaggle-agent scout-competitions`: fetch active competitions and append a raw scout snapshot for coding-agent review.
+- `kaggle-agent drive-sync push`: copy changed local state/data files to Google Drive without deleting history.
 
 Future commands:
 
@@ -107,4 +108,10 @@ Scout from saved Kaggle JSON without network access:
 
 ```bash
 python -m kaggle_agent.cli scout-competitions --from-file /tmp/kaggle-competitions.json --json
+```
+
+Push changed local state files to Google Drive:
+
+```bash
+python -m kaggle_agent.cli drive-sync push --json
 ```

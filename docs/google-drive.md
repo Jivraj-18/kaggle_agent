@@ -1,8 +1,8 @@
 # Google Drive Archive
 
-Use Google Drive for local state/data/artifact archives that should not live in Git.
+Use Google Drive for local state/data/artifacts that should not live in Git.
 
-Code and lightweight docs live in GitHub. Mutable Kaggle memory, downloaded data, notebook outputs, submission files, logs, and long-running experiment archives should be copied to Google Drive when they need to be preserved outside this machine.
+Code and lightweight docs live in GitHub. Mutable Kaggle memory, downloaded data, notebook outputs, submission files, logs, and long-running experiment archives live locally first and are copied to Google Drive when they need to survive beyond this machine.
 
 ## Folder
 
@@ -10,32 +10,36 @@ Code and lightweight docs live in GitHub. Mutable Kaggle memory, downloaded data
 - Folder ID: `1SOZL5T00dVthyWae5TEAQAhh2LGbjr4x`
 - URL: https://drive.google.com/drive/folders/1SOZL5T00dVthyWae5TEAQAhh2LGbjr4x
 - Created: `2026-07-07T11:34:42.263Z`
+- Account: `jivibd@gmail.com`
 
-## CLI
+## Sync
 
-Authenticated tool:
+The repo uses `gws` for Drive access and `config/drive.json` for the archive folder.
 
-```bash
-gws
-```
-
-List archive folder metadata:
+Push changed files:
 
 ```bash
-gws drive files get --params '{"fileId":"1SOZL5T00dVthyWae5TEAQAhh2LGbjr4x","fields":"id,name,webViewLink,mimeType,createdTime"}'
+python -m kaggle_agent.cli drive-sync push --json
 ```
 
-Upload an archive file into the folder:
+Push a specific root:
 
 ```bash
-gws drive +upload --upload path/to/archive.zip \
-  --json '{"name":"archive.zip","parents":["1SOZL5T00dVthyWae5TEAQAhh2LGbjr4x"]}'
+python -m kaggle_agent.cli drive-sync push --root state --json
 ```
+
+The sync stores file hashes and Drive IDs in ignored local state:
+
+```text
+state/drive_manifest.json
+```
+
+It uploads new files, updates changed files, skips unchanged files, and never deletes remote files.
 
 ## Agent Rules
 
 - Do not commit `state/` to Git.
 - Do not commit competition data, notebook outputs, submissions, or logs to Git.
 - Never delete past local or Drive history unless the user explicitly asks.
-- Prefer append-only archives with timestamps.
+- Prefer raw files over zip archives.
 - Future agents should read Git for code and Google Drive for archived state/data.

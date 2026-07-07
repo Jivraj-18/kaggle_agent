@@ -1,7 +1,10 @@
 import argparse
 import json
+from pathlib import Path
 from typing import Any
 
+from .config import PROJECT_ROOT
+from .drive_sync import push_roots
 from .kaggle_cli import kernel_status, list_competitions as kaggle_list_competitions
 from .scout import build_scout_item
 from .state import (
@@ -144,6 +147,14 @@ def validate(args: argparse.Namespace) -> None:
     emit({"ok": True, "errors": []}, args.json)
 
 
+def drive_sync_push(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    config = json.loads(args.config.read_text(encoding="utf-8"))
+    folder_id = args.folder_id or config["archive_folder_id"]
+    roots = args.root or config.get("roots", ["state"])
+    emit(push_roots(roots, folder_id), args.json)
+
+
 def scout_competitions(args: argparse.Namespace) -> None:
     ensure_state_files()
     items: list[dict[str, Any]] = []
@@ -204,6 +215,15 @@ def build_parser() -> argparse.ArgumentParser:
     valid = sub.add_parser("validate-state")
     valid.add_argument("--json", action="store_true")
     valid.set_defaults(func=validate)
+
+    drive_sync = sub.add_parser("drive-sync")
+    drive_sync_sub = drive_sync.add_subparsers(dest="drive_sync_command", required=True)
+    drive_push = drive_sync_sub.add_parser("push")
+    drive_push.add_argument("--config", type=Path, default=PROJECT_ROOT / "config" / "drive.json")
+    drive_push.add_argument("--folder-id")
+    drive_push.add_argument("--root", action="append")
+    drive_push.add_argument("--json", action="store_true")
+    drive_push.set_defaults(func=drive_sync_push)
 
     scout = sub.add_parser("scout-competitions")
     scout.add_argument(
