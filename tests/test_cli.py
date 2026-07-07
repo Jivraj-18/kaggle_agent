@@ -548,6 +548,54 @@ print("Successfully submitted to competition")
         self.assertTrue(runs[0]["submitted"])
         self.assertEqual(runs[0]["next_action"], "check_leaderboard")
 
+    def test_submit_file_uses_real_kaggle_ref_to_avoid_duplicate_on_refresh(self):
+        # Found live: submit-file invented a local ref (competition:sha256[:12]),
+        # but a later `submissions refresh` matches by Kaggle's own numeric ref,
+        # creating a second, disconnected row for the same real submission. Look
+        # up the real ref right after submitting so both write to the same row.
+        submission = Path(self.tmp.name) / "submission.csv"
+        submission.write_text("id,target\n1,0.5\n", encoding="utf-8")
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        calls = Path(self.tmp.name) / "uvx-calls.jsonl"
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+args = sys.argv[1:]
+with open(os.environ["UVX_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(args) + "\\n")
+if "submissions" in args:
+    print(json.dumps([
+        {"ref": 999888, "fileName": "submission.csv", "description": "exp-key-1 candidate", "status": "SubmissionStatus.COMPLETE", "publicScore": ""}
+    ]))
+else:
+    print("Successfully submitted to competition")
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        submitted = self.run_cli(
+            "submissions",
+            "submit-file",
+            "--competition-slug",
+            "demo-comp",
+            "--file",
+            str(submission),
+            "--message",
+            "exp-key-1 candidate",
+            "--experiment-key",
+            "exp-key-1",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UVX_CALLS": str(calls)},
+        )
+        self.assertEqual(submitted.returncode, 0, submitted.stderr)
+        body = json.loads(submitted.stdout)
+        self.assertEqual(body["submission"]["submission_ref"], "999888")
+
     def test_refresh_submissions_updates_scores_from_kaggle(self):
         self.run_cli(
             "submissions",
@@ -594,6 +642,31 @@ print(json.dumps([{"ref": "sub-1", "fileName": "submission.csv", "status": "comp
             call,
             ["kaggle", "competitions", "submissions", "demo-comp", "--format", "json", "--page-size", "200"],
         )
+
+    def test_refresh_submissions_normalizes_enum_prefixed_status(self):
+        # Found live: real Kaggle output is "SubmissionStatus.COMPLETE", not
+        # "complete". The valid-status check didn't strip the prefix, so a real,
+        # complete submission was recorded as valid: false.
+        self.run_cli(
+            "submissions",
+            "add",
+            "--ref",
+            "sub-1",
+            "--competition-slug",
+            "demo-comp",
+            "--json",
+        )
+        leaderboard = json.dumps(
+            [{"ref": "sub-1", "fileName": "submission.csv", "status": "SubmissionStatus.COMPLETE", "publicScore": "0.7"}]
+        )
+        _, env_overrides = self.stub_uvx(leaderboard)
+        refreshed = self.run_cli(
+            "submissions", "refresh", "--competition-slug", "demo-comp", "--json", env_overrides=env_overrides
+        )
+        self.assertEqual(refreshed.returncode, 0, refreshed.stderr)
+        rows = json.loads(refreshed.stdout)
+        self.assertTrue(rows[0]["valid"])
+        self.assertEqual(rows[0]["status"], "COMPLETE")
 
     def stub_uvx(self, output_json: str) -> tuple[Path, dict]:
         bin_dir = Path(self.tmp.name) / "bin"

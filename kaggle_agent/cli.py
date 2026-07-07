@@ -456,9 +456,26 @@ def submit_file(args: argparse.Namespace) -> None:
         )
         raise SystemExit(result.returncode)
 
+    # Look up the real Kaggle ref right away: submissions refresh matches by
+    # that ref, and a synthetic local one would create a second, disconnected
+    # row for the same real submission on the next refresh.
+    real_ref = None
+    lookup = competition_submissions(args.competition_slug)
+    if lookup.returncode == 0:
+        match = next(
+            (
+                r
+                for r in parse_json_output(lookup.stdout, default=[])
+                if r.get("description") == args.message and r.get("fileName") == args.file.name
+            ),
+            None,
+        )
+        if match:
+            real_ref = str(match.get("ref") or match.get("id") or match.get("submissionId"))
+
     digest = file_sha256(args.file)
     row = {
-        "submission_ref": args.ref or f"{args.competition_slug}:{digest[:12]}",
+        "submission_ref": real_ref or args.ref or f"{args.competition_slug}:{digest[:12]}",
         "competition_slug": args.competition_slug,
         "experiment_key": args.experiment_key,
         "kernel_slug": args.kernel_slug,
@@ -490,6 +507,13 @@ def maybe_float(value: Any) -> float | None:
     return float(value)
 
 
+def normalize_status(value: Any) -> str | None:
+    """Strip a Python-enum-style prefix, e.g. "SubmissionStatus.COMPLETE" -> "COMPLETE"."""
+    if not value:
+        return value
+    return str(value).rsplit(".", 1)[-1]
+
+
 def refresh_submissions(args: argparse.Namespace) -> None:
     ensure_state_files()
     result = competition_submissions(args.competition_slug)
@@ -511,6 +535,7 @@ def refresh_submissions(args: argparse.Namespace) -> None:
     for idx, raw in enumerate(raw_rows):
         ref = str(raw.get("ref") or raw.get("id") or raw.get("submissionId") or f"{args.competition_slug}:{idx}")
         previous = existing.get(ref, {})
+        status = normalize_status(raw.get("status")) or previous.get("status")
         row = {
             "submission_ref": ref,
             "competition_slug": args.competition_slug,
@@ -518,10 +543,10 @@ def refresh_submissions(args: argparse.Namespace) -> None:
             "kernel_slug": previous.get("kernel_slug"),
             "version": previous.get("version"),
             "file_name": raw.get("fileName") or previous.get("file_name"),
-            "status": raw.get("status") or previous.get("status"),
+            "status": status,
             "public_score": maybe_float(raw.get("publicScore")),
             "private_score": maybe_float(raw.get("privateScore")),
-            "valid": str(raw.get("status", "")).lower() in {"complete", "completed", "submitted"},
+            "valid": str(status or "").lower() in {"complete", "completed", "submitted"},
             "raw": raw,
         }
         refreshed.append(upsert_by_key("submissions.json", "submission_ref", row))
