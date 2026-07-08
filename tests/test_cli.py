@@ -395,6 +395,51 @@ print("Kernel push queued")
         self.assertEqual(runs[0]["next_action"], "check_status")
         self.assertEqual(notebooks[0]["source_sha256"], body["notebook"]["source_sha256"])
 
+    def test_push_notebook_uses_real_slug_when_kaggle_rewrites_it(self):
+        # Found live pushing heavy-equipment exp001: kernel-metadata.json's
+        # "id" isn't guaranteed to be the final slug. If it doesn't match
+        # Kaggle's clean-url-slugification of "title", Kaggle silently
+        # resolves to a different real slug and only warns about it in
+        # stdout, still exiting 0. Trusting --kernel-slug as-is meant every
+        # later `runs check`/pull-output call failed with a real, wrong slug.
+        notebook_dir = Path(self.tmp.name) / "kernel"
+        notebook_dir.mkdir()
+        (notebook_dir / "kernel-metadata.json").write_text(
+            json.dumps({"id": "user/demo-kern", "competition_sources": ["demo-comp"]}),
+            encoding="utf-8",
+        )
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+print("Your kernel title does not resolve to the specified id. This may result in surprising behavior.")
+print("Kernel version 1 successfully pushed.  Please check progress at https://www.kaggle.com/code/user/demo-kernel-full-title")
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        pushed = self.run_cli(
+            "notebooks",
+            "push",
+            "--path",
+            str(notebook_dir),
+            "--competition-slug",
+            "demo-comp",
+            "--kernel-slug",
+            "user/demo-kern",
+            "--version",
+            "1",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+        self.assertEqual(pushed.returncode, 0, pushed.stderr)
+        body = json.loads(pushed.stdout)
+        self.assertEqual(body["run"]["run_id"], "user/demo-kernel-full-title:v1")
+        self.assertEqual(body["run"]["kernel_slug"], "user/demo-kernel-full-title")
+        self.assertTrue(body.get("kernel_slug_corrected"))
+
     def test_push_notebook_blocks_invalid_metadata_before_kaggle_cli(self):
         notebook_dir = Path(self.tmp.name) / "kernel"
         notebook_dir.mkdir()

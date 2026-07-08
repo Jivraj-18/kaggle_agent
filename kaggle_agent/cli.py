@@ -274,7 +274,11 @@ def push_notebook(args: argparse.Namespace) -> None:
         )
         raise SystemExit(result.returncode)
 
-    notebook_id = args.notebook_id or f"{args.kernel_slug}:v{args.version or 'latest'}"
+    real_slug = parse_pushed_kernel_slug(result.stdout)
+    kernel_slug_corrected = bool(real_slug and real_slug != args.kernel_slug)
+    kernel_slug = real_slug or args.kernel_slug
+
+    notebook_id = args.notebook_id or f"{kernel_slug}:v{args.version or 'latest'}"
     notebook = upsert_by_key(
         "notebooks.json",
         "notebook_id",
@@ -282,7 +286,7 @@ def push_notebook(args: argparse.Namespace) -> None:
             "notebook_id": notebook_id,
             "competition_slug": args.competition_slug,
             "experiment_key": args.experiment_key,
-            "kernel_slug": args.kernel_slug,
+            "kernel_slug": kernel_slug,
             "version": args.version,
             "source_sha256": sha256_dir(args.path),
             "status": "pushed",
@@ -295,10 +299,10 @@ def push_notebook(args: argparse.Namespace) -> None:
         "runs.json",
         "run_id",
         {
-            "run_id": f"{args.kernel_slug}:v{args.version or 'latest'}",
+            "run_id": f"{kernel_slug}:v{args.version or 'latest'}",
             "competition_slug": args.competition_slug,
             "experiment_key": args.experiment_key,
-            "kernel_slug": args.kernel_slug,
+            "kernel_slug": kernel_slug,
             "version": args.version,
             "status": "pushed",
             "outputs_pulled": False,
@@ -306,7 +310,16 @@ def push_notebook(args: argparse.Namespace) -> None:
             "next_action": "check_status",
         },
     )
-    emit({"notebook": notebook, "run": run, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
+    emit(
+        {
+            "notebook": notebook,
+            "run": run,
+            "kaggle_stdout": result.stdout.strip(),
+            "kaggle_stderr": result.stderr.strip(),
+            "kernel_slug_corrected": kernel_slug_corrected,
+        },
+        args.json,
+    )
 
 
 def list_notebooks(args: argparse.Namespace) -> None:
@@ -530,6 +543,16 @@ def normalize_status(value: Any) -> str | None:
     if not value:
         return value
     return str(value).rsplit(".", 1)[-1]
+
+
+def parse_pushed_kernel_slug(stdout: str) -> str | None:
+    """kernel-metadata.json's "id" isn't guaranteed to be the real slug: if it
+    doesn't match Kaggle's clean-url-slugification of "title", Kaggle silently
+    resolves to a different slug, only warning about it in stdout while still
+    exiting 0. Parse the real slug from the kaggle.com/code/<owner>/<slug> URL
+    Kaggle always prints on success, rather than trusting the input arg."""
+    match = re.search(r"kaggle\.com/code/([\w.-]+/[\w.-]+)", stdout)
+    return match.group(1) if match else None
 
 
 def refresh_submissions(args: argparse.Namespace) -> None:
