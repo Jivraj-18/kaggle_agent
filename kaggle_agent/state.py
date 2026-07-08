@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,16 @@ def append_jsonl(name: str, value: dict[str, Any]) -> None:
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def generate_id(prefix: str) -> str:
+    """Timestamp + short random suffix. Found live: registering several
+    records (e.g. multiple experiments from one parallel_runner batch) in
+    quick succession can land inside the same wall-clock second — a
+    timestamp-only id then collides and later upserts silently overwrite
+    earlier records instead of creating new ones."""
+    timestamp = utc_now().replace(":", "").replace("-", "")
+    return f"{prefix}-{timestamp}-{uuid.uuid4().hex[:6]}"
 
 
 def parse_utc(value: str | None) -> datetime | None:

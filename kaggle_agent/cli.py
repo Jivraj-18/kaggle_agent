@@ -34,6 +34,7 @@ from .token_usage import parse_claude_transcript
 from .state import (
     append_jsonl,
     ensure_state_files,
+    generate_id,
     read_json,
     read_list,
     parse_utc,
@@ -158,7 +159,7 @@ def experiment_key(row: dict[str, Any]) -> str:
 def add_experiment(args: argparse.Namespace) -> None:
     ensure_state_files()
     row = {
-        "experiment_id": args.experiment_id or f"{args.competition_slug}-{utc_now().replace(':', '').replace('-', '')}",
+        "experiment_id": args.experiment_id or generate_id(args.competition_slug),
         "competition_slug": args.competition_slug,
         "phase": args.phase,
         "family": args.family,
@@ -345,7 +346,7 @@ def validate_notebook_metadata(args: argparse.Namespace) -> None:
 def add_task(args: argparse.Namespace) -> None:
     ensure_state_files()
     row = {
-        "task_id": args.task_id or f"{args.kind}-{utc_now().replace(':', '').replace('-', '')}",
+        "task_id": args.task_id or generate_id(args.kind),
         "competition_slug": args.competition_slug,
         "kind": args.kind,
         "priority": args.priority,

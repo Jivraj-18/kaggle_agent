@@ -18,6 +18,16 @@ class StateTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_generate_id_is_unique_across_rapid_calls(self):
+        # Found live registering 3 experiments from one parallel_runner batch:
+        # experiment_id/task_id auto-generation used only second-resolution
+        # timestamps, so 3 calls inside the same wall-clock second produced
+        # the SAME id and silently overwrote each other via upsert -- only
+        # the last of 3 registered experiments survived.
+        ids = {self.state.generate_id("demo") for _ in range(20)}
+        self.assertEqual(len(ids), 20)
+        self.assertTrue(all(i.startswith("demo-") for i in ids))
         os.environ.pop("KAGGLE_AGENT_STATE_DIR", None)
 
     def test_ensure_state_files(self):
