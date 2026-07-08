@@ -43,6 +43,8 @@ Required for heavy runs:
 
 `status` values `resume-context` treats as terminal (not pending): `complete`, `completed`, `submitted`, `stopped` (case-insensitive). Anything else, including the default `planned`, counts as pending. Found live: `--status completed` (past tense) didn't match a filter checking only `complete`, so a finished, submitted experiment stayed flagged as pending forever — fixed, but this is why the vocabulary is spelled out here now.
 
+**`completed`/`complete` means the experiment went through push → Kaggle run → review** — not just "the local dev work is done." A locally smoke-tested experiment that hasn't been pushed yet should stay `planned`; marking it `completed` makes it (and its competition) vanish from `resume-context` with zero next action, even if it's a promising result waiting on a human push decision. Found live: a fresh subagent implemented and locally validated a real experiment (CV 0.20529, beating the prior public score), correctly used `outcome: "local_smoke_test_passed_not_pushed"` to capture that nuance, but set `status: "completed"` anyway — self-contradictory, and it hid the result entirely. Use `outcome` for that nuance; keep `status` tracking pipeline position (planned → pushed/running → completed).
+
 Recommended phase values:
 
 ```text
