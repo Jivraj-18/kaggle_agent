@@ -508,6 +508,14 @@ def submit_file(args: argparse.Namespace) -> None:
             lambda item: item.get("run_id") == run_id,
             {"submitted": True, "next_action": "check_leaderboard"},
         )
+        # A submitted file resolves any open human_review_submission task for
+        # this run (created by runs review-output). Found live: this was never
+        # closed, leaving a stale "pending review" task after real submission.
+        update_matching(
+            "tasks.json",
+            lambda item: item.get("task_id") == f"{run_id}-human_review_submission" and item.get("status") == "open",
+            {"status": "complete"},
+        )
     emit({"submission": submission, "kaggle_stdout": result.stdout.strip(), "kaggle_stderr": result.stderr.strip()}, args.json)
 
 

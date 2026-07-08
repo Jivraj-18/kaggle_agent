@@ -548,6 +548,55 @@ print("Successfully submitted to competition")
         self.assertTrue(runs[0]["submitted"])
         self.assertEqual(runs[0]["next_action"], "check_leaderboard")
 
+    def test_submit_file_completes_matching_human_review_submission_task(self):
+        # Found live: a real human_review_submission task (created by
+        # review-output) stayed open forever after the file was actually
+        # submitted — submit-file never closed it, so a future Planner would
+        # see a stale "pending review" task for work already done.
+        submission = Path(self.tmp.name) / "submission.csv"
+        submission.write_text("id,target\n1,0.5\n", encoding="utf-8")
+        self.run_cli(
+            "tasks",
+            "add",
+            "--task-id",
+            "user/demo-kernel:v2-human_review_submission",
+            "--competition-slug",
+            "demo-comp",
+            "--kind",
+            "human_review_submission",
+            "--priority",
+            "high",
+            "--notes",
+            "Review output artifact",
+        )
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            "#!/usr/bin/env python3\nprint('Successfully submitted to competition')\n", encoding="utf-8"
+        )
+        fake_uvx.chmod(0o755)
+
+        submitted = self.run_cli(
+            "submissions",
+            "submit-file",
+            "--competition-slug",
+            "demo-comp",
+            "--file",
+            str(submission),
+            "--message",
+            "exp-key-1 candidate",
+            "--kernel-slug",
+            "user/demo-kernel",
+            "--version",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+        self.assertEqual(submitted.returncode, 0, submitted.stderr)
+        tasks = json.loads((Path(self.tmp.name) / "tasks.json").read_text(encoding="utf-8"))
+        self.assertEqual(tasks[0]["status"], "complete")
+
     def test_submit_file_uses_real_kaggle_ref_to_avoid_duplicate_on_refresh(self):
         # Found live: submit-file invented a local ref (competition:sha256[:12]),
         # but a later `submissions refresh` matches by Kaggle's own numeric ref,
