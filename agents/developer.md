@@ -33,6 +33,7 @@ Start from `templates/notebook-skeleton.py`. Before push:
 - Print fold-by-fold CV scores and post-transform shapes — this is the only evidence Reviewer/Summarizer get without rerunning the notebook.
 - Keep a summary docstring/cell at the top: `experiment_key`, hypothesis, `what_changed` — a human should understand intent in 10 seconds.
 - Config constants (paths, target/id columns, seed, fold count) at the top, not scattered magic values through the body.
+- Start the load/clean/base-feature section as a verbatim copy of `competitions/<slug>/preamble.py` (create it from the first accepted notebook if it doesn't exist yet), including its `KFold(shuffle=True, random_state=N)` call and row-loading order unchanged — this is what makes fold assignments identical across experiments so CV comparisons can be paired per-fold instead of eyeballing means (see `agents/planner.md`, `state/lessons.md`). Change that section only if the plan's hypothesis is specifically about it (e.g. a cleaning fix), and fold an accepted change back into `preamble.py` afterward so the next notebook starts from the improved version, not the old one. Kaggle script pushes are single-file, so this is copy-paste-from-canonical, not an import.
 
 ## Output Contract
 

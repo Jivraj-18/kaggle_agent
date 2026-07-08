@@ -18,7 +18,7 @@ description: Plan, improve, or continue a Kaggle competition. Use for requests l
    - `agents/planner.md`
    - `agents/developer.md`
    - `agents/reviewer.md`
-4. Inspect pending runs and prior experiments before planning.
+4. Inspect pending runs and prior experiments before planning. Check `competitions/<slug>/eda/findings.md` exists and post-dates the current best model. If it's missing or stale, this session's work is the EDA pass that creates/refreshes it — not a new modeling experiment (see `agents/planner.md`).
 5. Planner lists every viable candidate hypothesis for the current phase, each with its own phase, family, hypothesis, validation, stop condition, and `what_changed` (see `agents/planner.md`). If ≥2 candidates are CPU-only, plan them as a parallel batch by default — do not pick one and shelve the rest "for later" without a reason. GPU work stays a single hypothesis at a time.
 6. Register every candidate before push (one `experiments add` call per variant, even when they'll run in the same batch):
    ```bash
