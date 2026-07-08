@@ -7,7 +7,10 @@ from .config import PROJECT_ROOT, STATE_DIR
 from .gws_cli import CommandResult, drive_update, drive_upload
 from .state import utc_now
 
-SKIP_DIRS = {".git", ".pytest_cache", ".venv", "__pycache__"}
+SKIP_DIRS = {".git", ".pytest_cache", ".venv", "__pycache__", "data"}
+# "data" specifically: competitions/<slug>/data/ holds large, re-downloadable
+# raw Kaggle files (train.csv, zips) - re-fetchable from Kaggle any time, not
+# worth Drive quota/upload time. Plans/notebooks/kernel files still sync.
 SKIP_FILES = {".DS_Store", "drive_manifest.json"}
 
 
