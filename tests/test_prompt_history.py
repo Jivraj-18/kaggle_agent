@@ -4,8 +4,10 @@ import unittest
 from pathlib import Path
 
 from kaggle_agent.prompt_history import (
+    all_claude_prompts,
     append_prompt,
     claude_project_slug,
+    claude_sessions_for_project,
     codex_sessions_for_cwd,
     extract_text,
     latest_claude_prompt,
@@ -82,12 +84,54 @@ class LatestClaudePromptTests(unittest.TestCase):
         )
         self.assertEqual(latest_claude_prompt(path), "second real prompt")
 
+    def test_all_claude_prompts_returns_every_real_prompt_in_order(self):
+        # The live UserPromptSubmit hook can silently not fire (found live: a
+        # background-job session started with .claude/settings.json already
+        # present still didn't trigger it) — all_claude_prompts backs a sync
+        # fallback that backfills every prompt in a session, not just the
+        # latest, matching what sync-codex already does for Codex.
+        path = self.write_transcript(
+            [
+                {"type": "user", "isMeta": True, "message": {"content": "<local-command-caveat>...</local-command-caveat>"}},
+                {"type": "user", "message": {"content": "first real prompt"}},
+                {"type": "assistant", "message": {"content": [{"type": "text", "text": "reply"}]}},
+                {"type": "user", "message": {"content": "second real prompt"}},
+            ]
+        )
+        self.assertEqual(all_claude_prompts(path), ["first real prompt", "second real prompt"])
+
+    def test_all_claude_prompts_missing_file_returns_empty_list(self):
+        self.assertEqual(all_claude_prompts(Path("/nonexistent/transcript.jsonl")), [])
+
     def test_missing_file_returns_none(self):
         self.assertIsNone(latest_claude_prompt(Path("/nonexistent/transcript.jsonl")))
 
     def test_no_user_messages_returns_none(self):
         path = self.write_transcript([{"type": "assistant", "message": {"content": "hi"}}])
         self.assertIsNone(latest_claude_prompt(path))
+
+
+class ClaudeSessionsForProjectTests(unittest.TestCase):
+    def test_lists_session_ids_and_prompts_under_project_slug_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            projects_dir = Path(tmp)
+            slug_dir = projects_dir / "-home-x-proj"
+            slug_dir.mkdir()
+            (slug_dir / "session-a.jsonl").write_text(
+                json.dumps({"type": "user", "message": {"content": "prompt from session a"}}) + "\n",
+                encoding="utf-8",
+            )
+            (slug_dir / "session-b.jsonl").write_text(
+                json.dumps({"type": "user", "message": {"content": "prompt from session b"}}) + "\n",
+                encoding="utf-8",
+            )
+            results = claude_sessions_for_project(projects_dir, "-home-x-proj")
+            by_id = {r["session_id"]: r["prompts"] for r in results}
+            self.assertEqual(by_id, {"session-a": ["prompt from session a"], "session-b": ["prompt from session b"]})
+
+    def test_missing_project_dir_returns_empty_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(claude_sessions_for_project(Path(tmp), "-nonexistent-slug"), [])
 
 
 class CodexSessionsForCwdTests(unittest.TestCase):

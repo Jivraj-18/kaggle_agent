@@ -34,10 +34,10 @@ def extract_text(content: Any) -> str | None:
     return text
 
 
-def latest_claude_prompt(transcript_path: Path) -> str | None:
+def all_claude_prompts(transcript_path: Path) -> list[str]:
     if not transcript_path.exists():
-        return None
-    latest: str | None = None
+        return []
+    prompts: list[str] = []
     for line in transcript_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -50,8 +50,29 @@ def latest_claude_prompt(transcript_path: Path) -> str | None:
             continue
         text = extract_text((row.get("message") or {}).get("content"))
         if text:
-            latest = text
-    return latest
+            prompts.append(text)
+    return prompts
+
+
+def latest_claude_prompt(transcript_path: Path) -> str | None:
+    prompts = all_claude_prompts(transcript_path)
+    return prompts[-1] if prompts else None
+
+
+def claude_sessions_for_project(projects_dir: Path, project_slug: str) -> list[dict[str, Any]]:
+    """Backfill fallback for the live UserPromptSubmit hook (found to have a
+    real gap: the hook can succeed yet log nothing, see log_claude_prompt).
+    Lists every session transcript under projects_dir/project_slug/ with all
+    its real prompts, for sync-claude to append anything the hook missed."""
+    slug_dir = projects_dir / project_slug
+    if not slug_dir.exists():
+        return []
+    results = []
+    for path in sorted(slug_dir.glob("*.jsonl")):
+        prompts = all_claude_prompts(path)
+        if prompts:
+            results.append({"session_id": path.stem, "prompts": prompts})
+    return results
 
 
 def codex_sessions_for_cwd(sessions_dir: Path, cwd: str) -> list[dict[str, Any]]:

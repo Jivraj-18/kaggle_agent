@@ -241,10 +241,10 @@ Kaggle outputs and pulled logs are recorded here:
 
 Cross-session, cross-harness log of what prompts were given and how to resume that session. One `## <date> — <harness> — session <id>` block per session, with a `Resume:` line (`claude --resume <id>` or `codex resume <id>`) and one bullet per prompt.
 
-- Claude Code: `.claude/settings.json` runs `prompt-history log-claude` as a `UserPromptSubmit` hook automatically.
-- Codex: `.codex/hooks.json` runs `prompt-history log-codex` as a `UserPromptSubmit` hook (payload includes `prompt` directly, no transcript re-read needed). Project-local Codex hooks only load once trusted — unverified from a non-interactive environment whether this actually fires; there's also a known open upstream bug (openai/codex#17532) about repo-local hooks not firing in interactive sessions via `config.toml` specifically (this uses the `hooks.json` sidecar form instead). Run `prompt-history sync-codex` (also in AGENTS.md's End Of Session step) as the verified fallback regardless — it scans `~/.codex/sessions/` for sessions whose recorded cwd matches this project and is safe to run repeatedly.
+- Claude Code: `.claude/settings.json` runs `prompt-history log-claude` as a `UserPromptSubmit` hook, verified live end-to-end (`claude -p` + `--debug-file` + a temporary stdin-dumping hook). Uses the hook payload's own `prompt` field directly — an earlier version re-read the session's transcript file instead, which raced the transcript writer and silently logged nothing; fixed. `prompt-history sync-claude` backfills from `~/.claude/projects/<slug>/*.jsonl` regardless, since a live hook can still fail silently for other reasons.
+- Codex: `.codex/hooks.json` runs `prompt-history log-codex` as a `UserPromptSubmit` hook (payload includes `prompt` directly). Project-local Codex hooks only load once trusted — unverified from a non-interactive environment whether this actually fires; there's also a known open upstream bug (openai/codex#17532) about repo-local hooks not firing in interactive sessions via `config.toml` specifically (this uses the `hooks.json` sidecar form instead). `prompt-history sync-codex` (also in AGENTS.md's End Of Session step) is the verified fallback — scans `~/.codex/sessions/` for sessions whose recorded cwd matches this project.
 
-Both append to the same file; idempotent (skips exact-duplicate prompts already logged under a session's header).
+Both harnesses: append to the same file; idempotent (skips exact-duplicate prompts already logged under a session's header). Trust neither live hook by default — run the matching `sync-*` command periodically or at session end to catch anything missed.
 
 Use:
 

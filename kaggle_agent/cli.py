@@ -22,7 +22,13 @@ from .kaggle_cli import (
     list_competitions as kaggle_list_competitions,
     parse_json_output,
 )
-from .prompt_history import append_prompt, claude_project_slug, codex_sessions_for_cwd, extract_text, latest_claude_prompt
+from .prompt_history import (
+    append_prompt,
+    claude_project_slug,
+    claude_sessions_for_project,
+    codex_sessions_for_cwd,
+    extract_text,
+)
 from .scout import build_scout_item
 from .token_usage import parse_claude_transcript
 from .state import (
@@ -795,23 +801,22 @@ def read_sessions_jsonl() -> list[dict[str, Any]]:
 
 
 def log_claude_prompt(args: argparse.Namespace) -> None:
-    """Claude Code UserPromptSubmit hook entrypoint: reads the hook's stdin
-    JSON for session_id, re-reads that session's own transcript (rather than
-    trusting an unverified prompt field in the hook payload), and appends the
-    latest prompt to state/prompt_history.md."""
+    """Claude Code UserPromptSubmit hook entrypoint. Uses the hook's own
+    stdin "prompt" field directly (verified live: session_id, cwd, prompt,
+    transcript_path are all present). Originally this re-read the session's
+    own transcript instead, which raced the transcript writer — the hook
+    fires before that very prompt is flushed to disk, so it silently found
+    nothing or a stale prompt. Found live via --debug-file + a temporary
+    stdin-dumping hook, not guessed."""
     ensure_state_files()
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError:
         payload = {}
     session_id = payload.get("session_id")
-    if not session_id:
-        emit({"ok": False, "reason": "no session_id in hook payload"}, args.json)
-        return
-    transcript_path = Path.home() / ".claude" / "projects" / claude_project_slug(PROJECT_ROOT) / f"{session_id}.jsonl"
-    prompt = latest_claude_prompt(transcript_path)
-    if not prompt:
-        emit({"ok": True, "logged": False}, args.json)
+    prompt = extract_text(payload.get("prompt"))
+    if not session_id or not prompt:
+        emit({"ok": False, "reason": "missing session_id or prompt in hook payload"}, args.json)
         return
     append_prompt(
         STATE_DIR / "prompt_history.md",
@@ -821,6 +826,27 @@ def log_claude_prompt(args: argparse.Namespace) -> None:
         prompt=prompt,
     )
     emit({"ok": True, "logged": True, "session_id": session_id}, args.json)
+
+
+def sync_claude_prompt_history(args: argparse.Namespace) -> None:
+    """Fallback/manual path for Claude Code, same rationale as sync-codex:
+    the live UserPromptSubmit hook has a proven failure mode (see
+    log_claude_prompt), so this backfills anything it missed by scanning
+    every real session transcript under this project's ~/.claude/projects/
+    slug directory. Safe to run repeatedly."""
+    ensure_state_files()
+    projects_dir = Path.home() / ".claude" / "projects"
+    sessions = claude_sessions_for_project(projects_dir, claude_project_slug(PROJECT_ROOT))
+    logged = 0
+    history_path = STATE_DIR / "prompt_history.md"
+    for session in sessions:
+        for prompt in session["prompts"]:
+            before = history_path.read_text(encoding="utf-8") if history_path.exists() else ""
+            append_prompt(history_path, harness="claude", session_id=session["session_id"], date=utc_now()[:10], prompt=prompt)
+            after = history_path.read_text(encoding="utf-8")
+            if after != before:
+                logged += 1
+    emit({"ok": True, "sessions_scanned": len(sessions), "prompts_logged": logged}, args.json)
 
 
 def log_codex_prompt(args: argparse.Namespace) -> None:
@@ -1123,6 +1149,9 @@ def build_parser() -> argparse.ArgumentParser:
     ph_log_claude = prompt_history_sub.add_parser("log-claude")
     ph_log_claude.add_argument("--json", action="store_true")
     ph_log_claude.set_defaults(func=log_claude_prompt)
+    ph_sync_claude = prompt_history_sub.add_parser("sync-claude")
+    ph_sync_claude.add_argument("--json", action="store_true")
+    ph_sync_claude.set_defaults(func=sync_claude_prompt_history)
     ph_log_codex = prompt_history_sub.add_parser("log-codex")
     ph_log_codex.add_argument("--json", action="store_true")
     ph_log_codex.set_defaults(func=log_codex_prompt)
