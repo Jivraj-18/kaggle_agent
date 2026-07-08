@@ -5,7 +5,36 @@ import time
 import unittest
 from pathlib import Path
 
-from kaggle_agent.parallel_runner import VariantSpec, run_variants
+from kaggle_agent.parallel_runner import VariantSpec, resource_budget_from_percent, run_variants
+
+
+class ResourceBudgetFromPercentTests(unittest.TestCase):
+    def test_converts_percentages_to_concrete_limits_using_injected_specs(self):
+        # 80% of 4 cores -> 3 concurrent (int truncation); 80% of 32000MB -> 25600MB.
+        max_concurrent, max_rss = resource_budget_from_percent(
+            cpu_percent=80, ram_percent=80, cpu_count=4, total_ram_mb_value=32000.0
+        )
+        self.assertEqual(max_concurrent, 3)
+        self.assertEqual(max_rss, 25600.0)
+
+    def test_never_returns_zero_concurrent_even_at_low_percent_or_single_core(self):
+        max_concurrent, _ = resource_budget_from_percent(
+            cpu_percent=5, ram_percent=50, cpu_count=1, total_ram_mb_value=1000.0
+        )
+        self.assertEqual(max_concurrent, 1)
+
+    def test_rejects_out_of_range_percentages(self):
+        with self.assertRaises(ValueError):
+            resource_budget_from_percent(cpu_percent=0, ram_percent=80, cpu_count=4, total_ram_mb_value=1000.0)
+        with self.assertRaises(ValueError):
+            resource_budget_from_percent(cpu_percent=80, ram_percent=101, cpu_count=4, total_ram_mb_value=1000.0)
+
+    def test_detects_real_machine_specs_when_not_injected(self):
+        # No injected values: must read the real machine (matches how
+        # kaggle-api-capabilities' probe measured 4 cores / ~32.9GB on Kaggle).
+        max_concurrent, max_rss = resource_budget_from_percent(cpu_percent=100, ram_percent=100)
+        self.assertGreaterEqual(max_concurrent, 1)
+        self.assertGreater(max_rss, 0.0)
 
 
 class RunVariantsTests(unittest.TestCase):

@@ -4,6 +4,7 @@ agents/developer.md. Never use this for GPU work — a GPU run is real Kaggle
 quota, not a cheap speculative branch, and stays one-at-a-time.
 """
 
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -37,6 +38,42 @@ def read_rss_mb(pid: int) -> float:
     except (FileNotFoundError, ProcessLookupError, ValueError, PermissionError):
         pass
     return 0.0
+
+
+def total_ram_mb() -> float:
+    """Total system RAM in MB, via /proc/meminfo (Linux — matches Kaggle's
+    kernel containers). Returns 0.0 if unreadable."""
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) / 1024
+    except (FileNotFoundError, ValueError):
+        pass
+    return 0.0
+
+
+def resource_budget_from_percent(
+    cpu_percent: float,
+    ram_percent: float,
+    cpu_count: int | None = None,
+    total_ram_mb_value: float | None = None,
+) -> tuple[int, float]:
+    """Convert "stay within X% of CPU/RAM" into concrete (max_concurrent,
+    max_total_rss_mb) for run_variants. Detects the real machine's specs by
+    default (os.cpu_count(), total_ram_mb()); cpu_count/total_ram_mb_value
+    let tests (or a caller with better info, e.g. a known Kaggle kernel
+    profile) inject known values instead. max_concurrent is always at least
+    1, regardless of how low cpu_percent is or how few cores exist."""
+    if not 0 < cpu_percent <= 100:
+        raise ValueError("cpu_percent must be in (0, 100]")
+    if not 0 < ram_percent <= 100:
+        raise ValueError("ram_percent must be in (0, 100]")
+    cores = cpu_count if cpu_count is not None else (os.cpu_count() or 1)
+    ram_mb = total_ram_mb_value if total_ram_mb_value is not None else total_ram_mb()
+    max_concurrent = max(1, int(cores * cpu_percent / 100))
+    max_total_rss_mb = ram_mb * ram_percent / 100
+    return max_concurrent, max_total_rss_mb
 
 
 def run_variants(
