@@ -30,3 +30,7 @@ Use one of:
 - `stop`.
 
 Give concrete reasons and the minimum required fix.
+
+## Batch Verdicts
+
+A parallel batch (see `agents/developer.md`) produces multiple independent candidates, each with its own submission file. Verdict every candidate on its own merits — do not collapse a batch into a single winner. Recommend submitting every candidate that passes checks and represents a genuinely distinct hypothesis (not near-duplicate variants of the same idea), up to the competition's real daily submission cap — verify that cap live (Kaggle will report it or reject an over-cap submit), never assume a number. Leaving a validated candidate unsubmitted when quota remains is a missed opportunity, not caution.
