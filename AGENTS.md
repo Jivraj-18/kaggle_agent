@@ -90,4 +90,4 @@ uv run python -m kaggle_agent.cli sessions end <session-id> \
 
 If exact token counts are unavailable, use the best available harness-reported value and set `--token-source`.
 
-If running as Codex, also run `uv run python -m kaggle_agent.cli prompt-history sync-codex --json` before finishing — Codex has no verified automatic hook for this (unlike Claude Code's `UserPromptSubmit` hook in `.claude/settings.json`), so it only happens if you run it. Logs to `state/prompt_history.md`, alongside Claude Code's entries, each with its harness's resume command.
+If running as Codex, also run `uv run python -m kaggle_agent.cli prompt-history sync-codex --json` before finishing. A live `.codex/hooks.json` `UserPromptSubmit` hook exists too, but project-local Codex hooks require trust approval and reliable firing in interactive sessions is unverified (see docs/state-schemas.md); treat this manual sync as the guaranteed path regardless. Logs to `state/prompt_history.md`, alongside Claude Code's entries, each with its harness's resume command.

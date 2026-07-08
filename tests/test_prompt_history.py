@@ -52,6 +52,11 @@ class ExtractTextTests(unittest.TestCase):
             extract_text("<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>")
         )
 
+    def test_filters_claude_task_notification(self):
+        # Found live: after a session resume, a background-task notification
+        # gets appended as a "user" type entry before the human's own message.
+        self.assertIsNone(extract_text("<task-notification>\n<task-id>abc</task-id>\n</task-notification>"))
+
     def test_empty_or_whitespace_returns_none(self):
         self.assertIsNone(extract_text("   "))
         self.assertIsNone(extract_text(""))

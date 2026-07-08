@@ -242,7 +242,7 @@ Kaggle outputs and pulled logs are recorded here:
 Cross-session, cross-harness log of what prompts were given and how to resume that session. One `## <date> — <harness> — session <id>` block per session, with a `Resume:` line (`claude --resume <id>` or `codex resume <id>`) and one bullet per prompt.
 
 - Claude Code: `.claude/settings.json` runs `prompt-history log-claude` as a `UserPromptSubmit` hook automatically.
-- Codex: no verified automatic hook exists; run `prompt-history sync-codex` manually or via AGENTS.md's End Of Session step. It scans `~/.codex/sessions/` for sessions whose recorded cwd matches this project.
+- Codex: `.codex/hooks.json` runs `prompt-history log-codex` as a `UserPromptSubmit` hook (payload includes `prompt` directly, no transcript re-read needed). Project-local Codex hooks only load once trusted — unverified from a non-interactive environment whether this actually fires; there's also a known open upstream bug (openai/codex#17532) about repo-local hooks not firing in interactive sessions via `config.toml` specifically (this uses the `hooks.json` sidecar form instead). Run `prompt-history sync-codex` (also in AGENTS.md's End Of Session step) as the verified fallback regardless — it scans `~/.codex/sessions/` for sessions whose recorded cwd matches this project and is safe to run repeatedly.
 
 Both append to the same file; idempotent (skips exact-duplicate prompts already logged under a session's header).
 

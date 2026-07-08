@@ -22,7 +22,7 @@ from .kaggle_cli import (
     list_competitions as kaggle_list_competitions,
     parse_json_output,
 )
-from .prompt_history import append_prompt, claude_project_slug, codex_sessions_for_cwd, latest_claude_prompt
+from .prompt_history import append_prompt, claude_project_slug, codex_sessions_for_cwd, extract_text, latest_claude_prompt
 from .scout import build_scout_item
 from .token_usage import parse_claude_transcript
 from .state import (
@@ -823,10 +823,42 @@ def log_claude_prompt(args: argparse.Namespace) -> None:
     emit({"ok": True, "logged": True, "session_id": session_id}, args.json)
 
 
+def log_codex_prompt(args: argparse.Namespace) -> None:
+    """Codex UserPromptSubmit hook entrypoint (.codex/hooks.json). Unlike
+    Claude Code, Codex's documented hook payload includes the prompt text
+    directly (session_id, cwd, prompt), so no transcript re-read is needed.
+    There is a known open upstream bug where repo-local hooks configured via
+    .codex/config.toml don't fire in interactive sessions
+    (openai/codex#17532); this uses the hooks.json sidecar form instead,
+    which isn't what that report covers, but hasn't been independently
+    confirmed to fire reliably either — sync-codex remains the tested
+    fallback regardless."""
+    ensure_state_files()
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    session_id = payload.get("session_id")
+    prompt = extract_text(payload.get("prompt"))
+    if not session_id or not prompt:
+        emit({"ok": False, "reason": "missing session_id or prompt in hook payload"}, args.json)
+        return
+    append_prompt(
+        STATE_DIR / "prompt_history.md",
+        harness="codex",
+        session_id=session_id,
+        date=utc_now()[:10],
+        prompt=prompt,
+    )
+    emit({"ok": True, "logged": True, "session_id": session_id}, args.json)
+
+
 def sync_codex_prompt_history(args: argparse.Namespace) -> None:
-    """Codex has no verified project-scoped hook for this; run manually or per
-    AGENTS.md's End Of Session step. Scans ~/.codex/sessions for sessions whose
-    recorded cwd matches this project and appends any new prompts."""
+    """Fallback/manual path — also run via AGENTS.md's End Of Session step,
+    since the live UserPromptSubmit hook in .codex/hooks.json is unverified
+    for interactive sessions (see log_codex_prompt). Scans ~/.codex/sessions
+    for sessions whose recorded cwd matches this project and appends any new
+    prompts; safe to run repeatedly, catches anything the hook missed."""
     ensure_state_files()
     sessions_dir = Path.home() / ".codex" / "sessions"
     sessions = codex_sessions_for_cwd(sessions_dir, str(PROJECT_ROOT))
@@ -1091,6 +1123,9 @@ def build_parser() -> argparse.ArgumentParser:
     ph_log_claude = prompt_history_sub.add_parser("log-claude")
     ph_log_claude.add_argument("--json", action="store_true")
     ph_log_claude.set_defaults(func=log_claude_prompt)
+    ph_log_codex = prompt_history_sub.add_parser("log-codex")
+    ph_log_codex.add_argument("--json", action="store_true")
+    ph_log_codex.set_defaults(func=log_codex_prompt)
     ph_sync_codex = prompt_history_sub.add_parser("sync-codex")
     ph_sync_codex.add_argument("--json", action="store_true")
     ph_sync_codex.set_defaults(func=sync_codex_prompt_history)

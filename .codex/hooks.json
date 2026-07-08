@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/jivraj/experiments/kaggle_agent && uv run python -m kaggle_agent.cli prompt-history log-codex --json 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

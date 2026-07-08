@@ -9,6 +9,7 @@ SYNTHETIC_PREFIXES = (
     "<local-command-caveat>",
     "<environment_context>",
     "<turn_aborted>",
+    "<task-notification>",
     "The following is the Codex agent history",
 )
 
