@@ -41,6 +41,8 @@ Required for heavy runs:
 
 `what_changed` is required when another experiment already exists for the same `competition_slug` and `family`.
 
+`status` values `resume-context` treats as terminal (not pending): `complete`, `completed`, `submitted`, `stopped` (case-insensitive). Anything else, including the default `planned`, counts as pending. Found live: `--status completed` (past tense) didn't match a filter checking only `complete`, so a finished, submitted experiment stayed flagged as pending forever — fixed, but this is why the vocabulary is spelled out here now.
+
 Recommended phase values:
 
 ```text

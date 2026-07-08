@@ -54,6 +54,32 @@ class CliTests(unittest.TestCase):
         self.assertIn("state/runs.json", body["state_files"])
         self.assertIn("state/observability/sessions.jsonl", body["state_files"])
 
+    def test_resume_context_does_not_flag_completed_experiment_as_pending(self):
+        # Found live by a fresh subagent with no inherited context: the
+        # pending-experiment filter checked status not in {"complete", ...},
+        # but `experiments add --status completed` (past tense, what a real
+        # session actually calls) never matched "complete" — a real,
+        # finished, submitted experiment kept showing up as needing
+        # plan_or_push forever.
+        self.run_cli(
+            "experiments",
+            "add",
+            "--competition-slug",
+            "demo-comp",
+            "--family",
+            "gbdt-baseline",
+            "--hypothesis",
+            "baseline",
+            "--status",
+            "completed",
+            "--json",
+        )
+        proc = self.run_cli("resume-context", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        body = json.loads(proc.stdout)
+        self.assertEqual(body["summary"]["pending_experiments"], 0)
+        self.assertNotIn("demo-comp", body["competition_status"])
+
     def test_session_start_end_writes_observability_jsonl(self):
         start = self.run_cli(
             "sessions",

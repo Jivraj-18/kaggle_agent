@@ -661,7 +661,9 @@ def resume_context(args: argparse.Namespace) -> None:
     tasks = read_list("tasks.json")
     pending_runs = [row for row in runs if str(row.get("status", "")).upper() not in terminal]
     pending_experiments = [
-        row for row in experiments if str(row.get("status", "")).lower() not in {"complete", "submitted", "stopped"}
+        row
+        for row in experiments
+        if str(row.get("status", "")).lower() not in {"complete", "completed", "submitted", "stopped"}
     ]
     open_tasks = [row for row in tasks if row.get("status") == "open"]
 
