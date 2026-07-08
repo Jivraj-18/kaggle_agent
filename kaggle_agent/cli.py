@@ -1,7 +1,10 @@
 import argparse
 import hashlib
 import json
+import os
+import re
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -19,6 +22,7 @@ from .kaggle_cli import (
     list_competitions as kaggle_list_competitions,
     parse_json_output,
 )
+from .prompt_history import append_prompt, claude_project_slug, codex_sessions_for_cwd, latest_claude_prompt
 from .scout import build_scout_item
 from .token_usage import parse_claude_transcript
 from .state import (
@@ -790,6 +794,59 @@ def read_sessions_jsonl() -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def log_claude_prompt(args: argparse.Namespace) -> None:
+    """Claude Code UserPromptSubmit hook entrypoint: reads the hook's stdin
+    JSON for session_id, re-reads that session's own transcript (rather than
+    trusting an unverified prompt field in the hook payload), and appends the
+    latest prompt to state/prompt_history.md."""
+    ensure_state_files()
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    session_id = payload.get("session_id")
+    if not session_id:
+        emit({"ok": False, "reason": "no session_id in hook payload"}, args.json)
+        return
+    transcript_path = Path.home() / ".claude" / "projects" / claude_project_slug(PROJECT_ROOT) / f"{session_id}.jsonl"
+    prompt = latest_claude_prompt(transcript_path)
+    if not prompt:
+        emit({"ok": True, "logged": False}, args.json)
+        return
+    append_prompt(
+        STATE_DIR / "prompt_history.md",
+        harness="claude",
+        session_id=session_id,
+        date=utc_now()[:10],
+        prompt=prompt,
+    )
+    emit({"ok": True, "logged": True, "session_id": session_id}, args.json)
+
+
+def sync_codex_prompt_history(args: argparse.Namespace) -> None:
+    """Codex has no verified project-scoped hook for this; run manually or per
+    AGENTS.md's End Of Session step. Scans ~/.codex/sessions for sessions whose
+    recorded cwd matches this project and appends any new prompts."""
+    ensure_state_files()
+    sessions_dir = Path.home() / ".codex" / "sessions"
+    sessions = codex_sessions_for_cwd(sessions_dir, str(PROJECT_ROOT))
+    logged = 0
+    for session in sessions:
+        for prompt in session["prompts"]:
+            before = (STATE_DIR / "prompt_history.md").read_text(encoding="utf-8") if (STATE_DIR / "prompt_history.md").exists() else ""
+            append_prompt(
+                STATE_DIR / "prompt_history.md",
+                harness="codex",
+                session_id=session["session_id"],
+                date=utc_now()[:10],
+                prompt=prompt,
+            )
+            after = (STATE_DIR / "prompt_history.md").read_text(encoding="utf-8")
+            if after != before:
+                logged += 1
+    emit({"ok": True, "sessions_scanned": len(sessions), "prompts_logged": logged}, args.json)
+
+
 def recompute_metrics(args: argparse.Namespace) -> None:
     ensure_state_files()
     experiments = read_list("experiments.json")
@@ -1028,6 +1085,15 @@ def build_parser() -> argparse.ArgumentParser:
     sess_list = sessions_sub.add_parser("list")
     sess_list.add_argument("--json", action="store_true")
     sess_list.set_defaults(func=list_sessions)
+
+    prompt_history = sub.add_parser("prompt-history")
+    prompt_history_sub = prompt_history.add_subparsers(dest="prompt_history_command", required=True)
+    ph_log_claude = prompt_history_sub.add_parser("log-claude")
+    ph_log_claude.add_argument("--json", action="store_true")
+    ph_log_claude.set_defaults(func=log_claude_prompt)
+    ph_sync_codex = prompt_history_sub.add_parser("sync-codex")
+    ph_sync_codex.add_argument("--json", action="store_true")
+    ph_sync_codex.set_defaults(func=sync_codex_prompt_history)
 
     metrics = sub.add_parser("metrics")
     metrics_sub = metrics.add_subparsers(dest="metrics_command", required=True)

@@ -237,6 +237,15 @@ Kaggle outputs and pulled logs are recorded here:
 }
 ```
 
+## prompt_history.md
+
+Cross-session, cross-harness log of what prompts were given and how to resume that session. One `## <date> — <harness> — session <id>` block per session, with a `Resume:` line (`claude --resume <id>` or `codex resume <id>`) and one bullet per prompt.
+
+- Claude Code: `.claude/settings.json` runs `prompt-history log-claude` as a `UserPromptSubmit` hook automatically.
+- Codex: no verified automatic hook exists; run `prompt-history sync-codex` manually or via AGENTS.md's End Of Session step. It scans `~/.codex/sessions/` for sessions whose recorded cwd matches this project.
+
+Both append to the same file; idempotent (skips exact-duplicate prompts already logged under a session's header).
+
 Use:
 
 ```bash

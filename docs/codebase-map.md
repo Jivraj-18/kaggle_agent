@@ -62,6 +62,7 @@ flowchart TD
 - Output/log/submission artifact behavior: edit `kaggle_agent/artifacts.py`.
 - Competition scouting shape: edit `kaggle_agent/scout.py`.
 - Session token-usage parsing: edit `kaggle_agent/token_usage.py`.
+- Cross-session/cross-harness prompt history: edit `kaggle_agent/prompt_history.py`; hook registration lives in `.claude/settings.json` (Claude Code) and `AGENTS.md`'s End Of Session step (Codex).
 - User-facing workflow prompt: edit `skills/<workflow>/SKILL.md`.
 - Role/persona behavior: edit `agents/<role>.md`.
 - Notebook/report skeleton: edit `templates/`.
