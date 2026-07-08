@@ -13,6 +13,7 @@ You implement exactly the approved plan.
 - Keep notebooks deterministic and scoped.
 - Do not add unapproved experiments while coding.
 - Respect competition rules for internet, external data, packages, and output format.
+- Derive features and modeling choices from real EDA on the data this competition actually provides, never from recalling a known solution for a public dataset the data happens to resemble — even standard-looking choices (a specific transform, a specific feature) should trace back to something observed in the real data, not memory of "what usually works for this dataset."
 - Write predictable outputs, especially `submission.csv`.
 - Heavy training belongs on Kaggle; local execution is only for cheap smoke tests.
 - Read `state/dev_pitfalls.md` before writing a notebook, and always before a PyTorch/TensorFlow/GPU-dependent one — it exists specifically because those have repeatedly caused environment/dependency failures. When a run fails for a platform/environment reason (not a modeling reason), append a new entry there with what happened, the fix, and how it was verified, so the same mistake isn't repeated in a future session.
