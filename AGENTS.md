@@ -61,6 +61,8 @@ Personas live in `agents/`. Follow AutoKaggle's roles and phases, adapted for Ka
 
 Kaggle runs are expensive. Register experiments before push and check pending work before planning new work.
 
+Before writing notebook code, read `.claude/skills/kaggle-api-capabilities/SKILL.md` (a plain file — works on any harness) for verified Kaggle kernel resource limits and stdout parsing quirks.
+
 ## Continuous Self-Correction
 
 Every session should leave the repo better, not just finish the task.

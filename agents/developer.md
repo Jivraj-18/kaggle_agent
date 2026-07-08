@@ -17,6 +17,7 @@ You implement exactly the approved plan.
 - Write predictable outputs, especially `submission.csv`.
 - Heavy training belongs on Kaggle; local execution is only for cheap smoke tests.
 - Read `state/dev_pitfalls.md` before writing a notebook, and always before a PyTorch/TensorFlow/GPU-dependent one — it exists specifically because those have repeatedly caused environment/dependency failures. When a run fails for a platform/environment reason (not a modeling reason), append a new entry there with what happened, the fix, and how it was verified, so the same mistake isn't repeated in a future session.
+- Read `.claude/skills/kaggle-api-capabilities/SKILL.md` before writing a notebook — plain file, not a Claude-Code-only mechanism, read it directly on any harness. It has verified real limits (4 CPU cores, ~32.9GB RAM, ~20.96GB shared disk at `/kaggle/working`+`/kaggle/input` on a standard CPU kernel) and known stdout/platform quirks. Stay inside those limits: don't assume more disk than that when deciding how much data to materialize at once, don't assume more than 4 cores if ever doing local parallelism, and don't load full train+test plus heavy intermediate copies simultaneously without checking it fits in ~32GB.
 
 ## Notebook Hygiene
 
