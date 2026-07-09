@@ -5,6 +5,9 @@ description = "Local-first Kaggle automation state and orchestration helpers"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+observability = ["langfuse>=4.13.2"]
+
 [project.scripts]
 kaggle-agent = "kaggle_agent.cli:main"
 
@@ -12,4 +15,7 @@ kaggle-agent = "kaggle_agent.cli:main"
 testpaths = ["tests"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "langfuse>=4.13.2",
+    "pytest>=8",
+]

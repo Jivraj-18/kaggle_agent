@@ -22,6 +22,7 @@ from .kaggle_cli import (
     list_competitions as kaggle_list_competitions,
     parse_json_output,
 )
+from .langfuse_sync import sync_all
 from .prompt_history import (
     append_prompt,
     claude_project_slug,
@@ -940,6 +941,36 @@ def sync_codex_prompt_history(args: argparse.Namespace) -> None:
     emit({"ok": True, "sessions_scanned": len(sessions), "prompts_logged": logged}, args.json)
 
 
+def push_langfuse(args: argparse.Namespace) -> None:
+    """Backfill real Claude/Codex session transcripts for this project into a
+    self-hosted Langfuse instance for browsing (competition -> session ->
+    prompt/response). Requires `uv sync --extra observability` and
+    LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY/LANGFUSE_HOST env vars (see
+    docs/google-drive.md-style docs/observability.md). Idempotent: tracks
+    already-synced session_ids in state/observability/langfuse_synced.json."""
+    ensure_state_files()
+    try:
+        from langfuse import Langfuse
+    except ImportError:
+        raise SystemExit("langfuse is not installed -- run: uv sync --extra observability")
+    client = Langfuse()
+    already_synced = set(read_json("observability/langfuse_synced.json", []))
+    newly_synced = sync_all(
+        client,
+        PROJECT_ROOT,
+        read_sessions_jsonl(),
+        Path.home() / ".claude" / "projects",
+        Path.home() / ".codex" / "sessions",
+        already_synced,
+    )
+    client.flush()
+    write_json("observability/langfuse_synced.json", sorted(already_synced | set(newly_synced)))
+    emit(
+        {"ok": True, "sessions_synced_this_run": newly_synced, "total_synced": len(already_synced) + len(newly_synced)},
+        args.json,
+    )
+
+
 def recompute_metrics(args: argparse.Namespace) -> None:
     ensure_state_files()
     experiments = read_list("experiments.json")
@@ -1199,6 +1230,12 @@ def build_parser() -> argparse.ArgumentParser:
     metrics_recompute = metrics_sub.add_parser("recompute")
     metrics_recompute.add_argument("--json", action="store_true")
     metrics_recompute.set_defaults(func=recompute_metrics)
+
+    observability = sub.add_parser("observability")
+    observability_sub = observability.add_subparsers(dest="observability_command", required=True)
+    obs_push_langfuse = observability_sub.add_parser("push-langfuse")
+    obs_push_langfuse.add_argument("--json", action="store_true")
+    obs_push_langfuse.set_defaults(func=push_langfuse)
 
     valid = sub.add_parser("validate-state")
     valid.add_argument("--json", action="store_true")
