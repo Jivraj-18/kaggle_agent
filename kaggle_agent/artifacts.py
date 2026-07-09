@@ -1,7 +1,10 @@
 import csv
 import hashlib
+import re
 from pathlib import Path
 from typing import Any
+
+SUBMISSION_FILENAME_RE = re.compile(r"^submission(_[A-Za-z0-9]+)?\.csv$")
 
 from .state import read_list, update_matching, upsert_by_key, utc_now, write_json
 
@@ -99,14 +102,22 @@ def review_output_artifact(run: dict[str, Any], artifact: dict[str, Any], sample
     passed_checks: list[str] = []
     failed_checks: list[str] = []
 
-    submission = by_name.get("submission.csv")
-    submission_path = Path(artifact["local_path"]) / "submission.csv"
-    if submission:
+    submission_matches = sorted(name for name in by_name if name and SUBMISSION_FILENAME_RE.match(name))
+    submission = None
+    submission_path = None
+    if len(submission_matches) == 1:
+        submission_name = submission_matches[0]
+        submission = by_name[submission_name]
+        submission_path = Path(artifact["local_path"]) / submission_name
         passed_checks.append("submission_csv_present")
         if submission.get("size", 0) > 0:
             passed_checks.append("submission_csv_nonempty")
         else:
             failed_checks.append("submission_csv_nonempty")
+    elif len(submission_matches) > 1:
+        # A batch variant's output dir should contain exactly one submission_<variant>.csv;
+        # more than one means variants overwrote a shared dir instead of using unique filenames.
+        failed_checks.append("submission_csv_ambiguous")
     else:
         failed_checks.append("submission_csv_present")
 
