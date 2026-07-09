@@ -22,6 +22,20 @@ FAILURE_CLASSES = {
     "unknown",
 }
 
+# The six AutoKaggle phases (docs/architecture.md, docs/state-schemas.md).
+# experiments.json[idx].phase must be one of these -- found live: with no
+# enum anywhere, every registered experiment ever used only "feature_engineering"
+# or "model_building_validation_prediction", silently making the other four
+# phases (including EDA itself) unreachable through the phase field.
+PHASES = {
+    "background_understanding",
+    "preliminary_eda",
+    "data_cleaning",
+    "in_depth_eda",
+    "feature_engineering",
+    "model_building_validation_prediction",
+}
+
 REQUIRED_FIELDS = {
     "experiments.json": ["competition_slug", "experiment_key", "hypothesis"],
     "runs.json": ["run_id", "competition_slug"],
@@ -142,6 +156,10 @@ def validate_state() -> list[str]:
         failure_class = row.get("failure_class")
         if failure_class is not None and failure_class not in FAILURE_CLASSES:
             errors.append(f"runs.json[{idx}].failure_class: unknown failure class {failure_class}")
+    for idx, row in enumerate(read_json("experiments.json", [])):
+        phase = row.get("phase")
+        if phase is not None and phase not in PHASES:
+            errors.append(f"experiments.json[{idx}].phase: unknown phase {phase}")
     return errors
 
 

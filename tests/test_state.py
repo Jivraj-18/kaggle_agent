@@ -67,9 +67,22 @@ class StateTests(unittest.TestCase):
                 ]
             )
         )
+        (Path(self.tmp.name) / "experiments.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "competition_slug": "demo",
+                        "experiment_key": "key-1",
+                        "hypothesis": "demo",
+                        "phase": "invented_phase",
+                    }
+                ]
+            )
+        )
         errors = self.state.validate_state()
         self.assertIn("profiles.json[0].metric_direction: expected one of maximize, minimize", errors)
         self.assertIn("runs.json[0].failure_class: unknown failure class mystery", errors)
+        self.assertIn("experiments.json[0].phase: unknown phase invented_phase", errors)
 
     def test_validate_state_checks_required_lineage_fields(self):
         self.state.ensure_state_files()

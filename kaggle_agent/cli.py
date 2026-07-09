@@ -32,6 +32,7 @@ from .prompt_history import (
 from .scout import build_scout_item
 from .token_usage import parse_claude_transcript
 from .state import (
+    PHASES,
     append_jsonl,
     ensure_state_files,
     generate_id,
@@ -1266,7 +1267,7 @@ def build_parser() -> argparse.ArgumentParser:
     exp_add = experiments_sub.add_parser("add")
     exp_add.add_argument("--experiment-id")
     exp_add.add_argument("--competition-slug", required=True)
-    exp_add.add_argument("--phase", default="model_building_validation_prediction")
+    exp_add.add_argument("--phase", default="model_building_validation_prediction", choices=sorted(PHASES))
     exp_add.add_argument("--family")
     exp_add.add_argument("--what-changed")
     exp_add.add_argument("--hypothesis", required=True)
