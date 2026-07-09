@@ -7,7 +7,9 @@ from kaggle_agent.prompt_history import (
     all_claude_prompts,
     append_prompt,
     claude_project_slug,
+    claude_session_turns,
     claude_sessions_for_project,
+    codex_session_turns,
     codex_sessions_for_cwd,
     extract_text,
     latest_claude_prompt,
@@ -179,6 +181,91 @@ class CodexSessionsForCwdTests(unittest.TestCase):
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0]["session_id"], "019abc")
             self.assertEqual(results[0]["prompts"], ["real codex prompt"])
+
+
+class ClaudeSessionTurnsTests(unittest.TestCase):
+    def write_transcript(self, rows: list[dict]) -> Path:
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8")
+        for row in rows:
+            tmp.write(json.dumps(row) + "\n")
+        tmp.close()
+        self.addCleanup(lambda: Path(tmp.name).unlink(missing_ok=True))
+        return Path(tmp.name)
+
+    def test_returns_ordered_user_and_assistant_text_turns_with_model(self):
+        # For pushing a session to an external trace viewer (Langfuse): needs
+        # both sides of the conversation in order, not just user prompts like
+        # all_claude_prompts. Assistant turns that are pure tool calls (no
+        # text block) carry no natural-language content and are skipped, same
+        # as extract_text already does for prompts.
+        path = self.write_transcript(
+            [
+                {"type": "user", "isMeta": True, "message": {"content": "<task-notification>skip</task-notification>"}},
+                {"type": "user", "timestamp": "2026-07-08T15:00:00Z", "message": {"content": "hello"}},
+                {
+                    "type": "assistant",
+                    "timestamp": "2026-07-08T15:00:05Z",
+                    "message": {"model": "claude-sonnet-5", "content": [{"type": "tool_use", "name": "Read", "input": {}}]},
+                },
+                {
+                    "type": "assistant",
+                    "timestamp": "2026-07-08T15:00:10Z",
+                    "message": {"model": "claude-sonnet-5", "content": [{"type": "text", "text": "hi there"}]},
+                },
+            ]
+        )
+        turns = claude_session_turns(path)
+        self.assertEqual(
+            turns,
+            [
+                {"role": "user", "text": "hello", "model": None, "timestamp": "2026-07-08T15:00:00Z"},
+                {"role": "assistant", "text": "hi there", "model": "claude-sonnet-5", "timestamp": "2026-07-08T15:00:10Z"},
+            ],
+        )
+
+    def test_missing_file_returns_empty_list(self):
+        self.assertEqual(claude_session_turns(Path("/nonexistent/transcript.jsonl")), [])
+
+
+class CodexSessionTurnsTests(unittest.TestCase):
+    def test_returns_ordered_user_and_assistant_text_turns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rollout-test.jsonl"
+            path.write_text(
+                "\n".join(
+                    json.dumps(row)
+                    for row in [
+                        {"type": "session_meta", "payload": {"id": "019abc", "cwd": "/home/x/proj"}},
+                        {
+                            "type": "response_item",
+                            "timestamp": "2026-05-19T10:24:19.000Z",
+                            "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "do the thing"}]},
+                        },
+                        {
+                            "type": "response_item",
+                            "payload": {"type": "function_call", "name": "shell"},
+                        },
+                        {
+                            "type": "response_item",
+                            "timestamp": "2026-05-19T10:24:22.000Z",
+                            "payload": {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "done"}]},
+                        },
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            turns = codex_session_turns(path)
+            self.assertEqual(
+                turns,
+                [
+                    {"role": "user", "text": "do the thing", "model": None, "timestamp": "2026-05-19T10:24:19.000Z"},
+                    {"role": "assistant", "text": "done", "model": None, "timestamp": "2026-05-19T10:24:22.000Z"},
+                ],
+            )
+
+    def test_missing_file_returns_empty_list(self):
+        self.assertEqual(codex_session_turns(Path("/nonexistent/transcript.jsonl")), [])
 
 
 class AppendPromptTests(unittest.TestCase):

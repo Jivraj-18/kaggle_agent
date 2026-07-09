@@ -24,7 +24,11 @@ def extract_text(content: Any) -> str | None:
     if isinstance(content, str):
         text = content
     elif isinstance(content, list):
-        parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") in ("text", "input_text")]
+        parts = [
+            b.get("text", "")
+            for b in content
+            if isinstance(b, dict) and b.get("type") in ("text", "input_text", "output_text")
+        ]
         text = "\n".join(p for p in parts if p)
     else:
         return None
@@ -73,6 +77,69 @@ def claude_sessions_for_project(projects_dir: Path, project_slug: str) -> list[d
         if prompts:
             results.append({"session_id": path.stem, "prompts": prompts})
     return results
+
+
+def claude_session_turns(transcript_path: Path) -> list[dict[str, Any]]:
+    """Ordered user/assistant text turns for one Claude Code session, for
+    pushing to an external trace viewer (e.g. Langfuse). Unlike
+    all_claude_prompts, includes assistant replies. Turns with no
+    natural-language text (pure tool-call turns) are skipped, same
+    filtering extract_text already applies to prompts."""
+    if not transcript_path.exists():
+        return []
+    turns: list[dict[str, Any]] = []
+    for line in transcript_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        row_type = row.get("type")
+        if row_type not in ("user", "assistant") or row.get("isMeta"):
+            continue
+        message = row.get("message") or {}
+        text = extract_text(message.get("content"))
+        if not text:
+            continue
+        turns.append(
+            {
+                "role": row_type,
+                "text": text,
+                "model": message.get("model") if row_type == "assistant" else None,
+                "timestamp": row.get("timestamp"),
+            }
+        )
+    return turns
+
+
+def codex_session_turns(transcript_path: Path) -> list[dict[str, Any]]:
+    """Ordered user/assistant text turns for one Codex session, mirroring
+    claude_session_turns. Non-message response_items (function_call,
+    reasoning, etc.) are skipped."""
+    if not transcript_path.exists():
+        return []
+    turns: list[dict[str, Any]] = []
+    for line in transcript_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("type") != "response_item":
+            continue
+        payload = row.get("payload") or {}
+        role = payload.get("role")
+        if payload.get("type") != "message" or role not in ("user", "assistant"):
+            continue
+        text = extract_text(payload.get("content"))
+        if not text:
+            continue
+        turns.append({"role": role, "text": text, "model": None, "timestamp": row.get("timestamp")})
+    return turns
 
 
 def codex_sessions_for_cwd(sessions_dir: Path, cwd: str) -> list[dict[str, Any]]:
