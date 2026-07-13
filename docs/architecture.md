@@ -8,6 +8,7 @@ This repo is a local-first Kaggle automation workspace. Kaggle provides remote n
 - Keep JSON state as the agent-facing source of truth in v0.
 - Preserve raw Kaggle rows, rules, files, logs, notebook outputs, and scores.
 - Run ML training on Kaggle unless a local smoke test is cheap and bounded.
+- Audit high-ranked public notebooks after joining; reproduce the strongest compliant candidate before planning original improvements.
 - Query Kaggle only when the user asks or when a known pending item is being checked.
 - Never make official submissions without an explicit human review step.
 - Keep code in GitHub and mutable state/data/artifacts in Google Drive.
@@ -43,13 +44,16 @@ The architecture goal is controlled iteration, not one-shot notebook generation.
 2. The coding agent reads raw scout data, `state/preferences.json`, `state/lessons.md`, prior competitions, runs, and submissions.
 3. The agent decides `join`, `watch`, `skip`, or `request-human-review` and records the decision.
 4. For a chosen competition, the agent snapshots rules, metric, files, sample submission, notebook constraints, and discussion notes.
-5. The agent writes a plan with a named hypothesis, expected artifact, validation method, stop condition, and compliance notes.
-6. Before any heavy run, the agent records the experiment in `state/experiments.json` with hypothesis, plan hash, notebook hash, status, and intended run link.
-7. The notebook developer creates or edits a Kaggle notebook and local smoke tests the notebook structure before push.
-8. `kaggle kernels push` starts the Kaggle run. The local state records notebook slug, version, source hash, metadata, and next action.
-9. The user later asks the agent to check pending work. The agent checks status once, pulls outputs only for terminal runs, and records logs/artifacts.
-10. The reviewer validates `submission.csv`, compares CV and leaderboard evidence, records lessons, and asks for human approval before official submit.
-11. `drive-sync push` copies changed local state/data files to Google Drive without deleting old history.
+5. `notebooks discover-public` records a score-ordered public shortlist and optionally pulls a few sources for text-only audit.
+6. Planner and Reviewer select the highest-ranked compliant, reproducible candidate; unsafe higher-ranked candidates get explicit rejection reasons.
+7. The agent reproduces that source as a baseline-only experiment under the repo's validation protocol, then creates EDA findings from its predictions before planning improvements.
+8. The agent writes each later plan as one measured delta from the accepted baseline, with a finding ID, validation method, stop condition, and compliance notes.
+9. Before any heavy run, the agent records the experiment in `state/experiments.json` with hypothesis, plan hash, notebook hash, status, and intended run link.
+10. The notebook developer creates or edits a Kaggle notebook and local smoke tests the notebook structure before push.
+11. `kaggle kernels push` starts the Kaggle run. The local state records notebook slug, version, source hash, metadata, and next action.
+12. The user later asks the agent to check pending work. The agent checks status once, pulls outputs only for terminal runs, and records logs/artifacts.
+13. The reviewer validates `submission.csv`, compares CV and leaderboard evidence, records lessons, and asks for human approval before official submit.
+14. `drive-sync push` copies changed local state/data files to Google Drive without deleting old history.
 
 ## Experiment Memory
 
@@ -77,6 +81,7 @@ Intentional reruns need `--allow-duplicate` and a clear note explaining why the 
 
 Before planning new work, future agents must read:
 
+- `state/notebooks.json`, including the selected public baseline and its review notes
 - `state/experiments.json`
 - `state/runs.json`
 - `state/submissions.json`
@@ -90,7 +95,7 @@ The default stance is no repeated heavy experiment unless the agent can explain 
 Persona files live in `agents/`.
 
 - Reader: builds competition/profile context from rules, metric, files, data shape, and constraints.
-- Planner: chooses the AutoKaggle phase, hypothesis, validation plan, and stop condition.
+- Planner: audits public baseline candidates, then chooses the AutoKaggle phase, hypothesis, validation plan, and stop condition.
 - Developer: writes notebook code or notebook diffs for exactly the approved plan.
 - Reviewer: blocks weak plans, invalid submissions, leakage risks, metric mismatch, and repeated churn.
 - Summarizer: records durable lessons and phase reports.
@@ -175,6 +180,8 @@ The artifact record joins to runs and experiments through `run_id` and `experime
 ```text
 competition_discovered
 -> competition_profile_built
+-> public_baselines_audited
+-> public_baseline_selected
 -> baseline_planned
 -> experiment_registered
 -> local_smoke_test_passed

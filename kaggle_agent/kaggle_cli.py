@@ -69,6 +69,34 @@ def kernel_push(path: str) -> CommandResult:
     return run_kaggle(["kernels", "push", "-p", path])
 
 
+def kernel_pull(kernel_slug: str, output_dir: str) -> CommandResult:
+    return run_kaggle(["kernels", "pull", kernel_slug, "-p", output_dir, "-m"])
+
+
+def list_public_kernels(
+    competition_slug: str,
+    page_size: int = 20,
+    sort_by: str = "scoreDescending",
+) -> tuple[list[dict], CommandResult]:
+    result = run_kaggle(
+        [
+            "kernels",
+            "list",
+            "--competition",
+            competition_slug,
+            "--page-size",
+            str(page_size),
+            "--sort-by",
+            sort_by,
+            "--format",
+            "json",
+        ]
+    )
+    if result.returncode != 0:
+        return [], result
+    return parse_json_output(result.stdout, default=[]), result
+
+
 def competition_submit(competition_slug: str, file_path: str, message: str) -> CommandResult:
     return run_kaggle(["competitions", "submit", "-c", competition_slug, "-f", file_path, "-m", message])
 

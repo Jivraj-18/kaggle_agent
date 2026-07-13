@@ -167,20 +167,25 @@ Notebook files should live in Google Drive or Kaggle, not Git:
 
 ```json
 {
-  "notebook_id": "owner/kernel:v1",
+  "notebook_id": "kaggle-public:owner/kernel",
   "competition_slug": "example",
-  "experiment_key": "sha256",
+  "experiment_key": null,
   "kernel_slug": "owner/kernel",
-  "version": 1,
-  "drive_file_id": "google-drive-id",
+  "version": null,
+  "source": "kaggle_public",
+  "baseline_role": "candidate",
+  "discovery_rank": 1,
+  "discovery_sort": "scoreDescending",
   "source_sha256": "sha256",
-  "status": "pushed",
-  "local_path": "/ignored/local/kernel-dir",
+  "status": "pulled",
+  "local_path": "research/public-notebooks/example/owner__kernel",
   "notes": ""
 }
 ```
 
-Use `notebooks add/list` to track references. Use `notebooks push` after Reviewer approval; it calls Kaggle CLI, records the notebook directory hash, and creates the matching `runs.json` handoff record with `next_action: check_status`.
+Use `notebooks discover-public --competition-slug <slug> --limit 10 --pull-top 5 --json` to record and pull public baseline candidates. The default `scoreDescending` ranking and any score in a title are discovery evidence only. Reviewer must inspect the source before `notebooks select-baseline <notebook-id> --notes <evidence> --json`; unpulled public candidates cannot be selected. Selecting a new baseline marks an older selection `superseded`.
+
+Use `notebooks add/list` to track other references. Use `notebooks push` after Reviewer approval; it calls Kaggle CLI, records the owned notebook directory hash, and creates the matching `runs.json` handoff record with `next_action: check_status`.
 
 Before pushing a Kaggle notebook, validate metadata:
 

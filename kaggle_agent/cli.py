@@ -17,9 +17,11 @@ from .kaggle_cli import (
     competition_submissions,
     competition_submit,
     kernel_output,
+    kernel_pull,
     kernel_push,
     kernel_status,
     list_competitions as kaggle_list_competitions,
+    list_public_kernels,
     parse_json_output,
 )
 from .langfuse_sync import sync_all
@@ -333,6 +335,141 @@ def list_notebooks(args: argparse.Namespace) -> None:
     if args.status:
         rows = [row for row in rows if row.get("status") == args.status]
     emit(rows, args.json)
+
+
+def discover_public_notebooks(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    if args.limit < 1:
+        raise SystemExit("limit must be at least 1")
+    if args.pull_top < 0 or args.pull_top > args.limit:
+        raise SystemExit("pull-top must be between 0 and limit")
+    rows, result = list_public_kernels(
+        args.competition_slug,
+        page_size=args.limit,
+        sort_by=args.sort_by,
+    )
+    if result.returncode != 0:
+        emit(
+            {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            args.json,
+        )
+        raise SystemExit(result.returncode)
+
+    existing_notebooks = {row.get("notebook_id"): row for row in read_list("notebooks.json")}
+    candidates = []
+    for rank, raw in enumerate(rows[: args.limit], start=1):
+        kernel_slug = raw.get("ref")
+        if not kernel_slug:
+            continue
+        notebook_id = f"kaggle-public:{kernel_slug}"
+        existing = existing_notebooks.get(notebook_id, {})
+        candidate = upsert_by_key(
+            "notebooks.json",
+            "notebook_id",
+            {
+                "notebook_id": notebook_id,
+                "competition_slug": args.competition_slug,
+                "experiment_key": None,
+                "kernel_slug": kernel_slug,
+                "version": None,
+                "source": "kaggle_public",
+                "baseline_role": existing.get("baseline_role", "candidate"),
+                "status": existing.get("status", "discovered"),
+                "title": raw.get("title"),
+                "author": raw.get("author"),
+                "last_run_time": raw.get("lastRunTime"),
+                "total_votes": raw.get("totalVotes"),
+                "discovery_rank": rank,
+                "discovery_sort": args.sort_by,
+                "url": f"https://www.kaggle.com/code/{kernel_slug}",
+                "raw": raw,
+                "notes": "Requires source, rules, validation, and leakage review before baseline selection.",
+            },
+        )
+        candidates.append(candidate)
+
+    pulls = []
+    output_dir = args.output_dir or (PROJECT_ROOT / "research" / "public-notebooks" / args.competition_slug)
+    for index, candidate in enumerate(candidates[: args.pull_top]):
+        kernel_slug = candidate["kernel_slug"]
+        directory_name = re.sub(r"[^A-Za-z0-9._-]+", "__", kernel_slug)
+        pull_dir = output_dir / directory_name
+        pull_dir.mkdir(parents=True, exist_ok=True)
+        pull_result = kernel_pull(kernel_slug, str(pull_dir))
+        ok = pull_result.returncode == 0
+        status = "pulled" if ok else "pull_failed"
+        if ok and candidate.get("baseline_role") == "selected":
+            status = "selected_baseline"
+        changes = {
+            "notebook_id": candidate["notebook_id"],
+            "status": status,
+            "local_path": str(pull_dir),
+            "source_sha256": sha256_dir(pull_dir) if ok else None,
+            "last_pull_stdout": pull_result.stdout.strip(),
+            "last_pull_stderr": pull_result.stderr.strip(),
+        }
+        updated = upsert_by_key("notebooks.json", "notebook_id", changes)
+        candidates[index] = updated
+        pulls.append(
+            {
+                "kernel_slug": kernel_slug,
+                "ok": ok,
+                "returncode": pull_result.returncode,
+                "local_path": str(pull_dir),
+                "stdout": pull_result.stdout.strip(),
+                "stderr": pull_result.stderr.strip(),
+            }
+        )
+
+    emit(
+        {
+            "competition_slug": args.competition_slug,
+            "sort_by": args.sort_by,
+            "candidates": candidates,
+            "pulls": pulls,
+            "agent_instruction": (
+                "Ranking is discovery evidence, not approval. Pull and review source before selecting a baseline."
+            ),
+        },
+        args.json,
+    )
+
+
+def select_baseline_notebook(args: argparse.Namespace) -> None:
+    ensure_state_files()
+    rows = read_list("notebooks.json")
+    target_index = next(
+        (index for index, row in enumerate(rows) if row.get("notebook_id") == args.notebook_id),
+        None,
+    )
+    if target_index is None:
+        raise SystemExit(f"notebook not found: {args.notebook_id}")
+    target = rows[target_index]
+    if target.get("source") == "kaggle_public" and target.get("status") not in {"pulled", "selected_baseline"}:
+        raise SystemExit("pull and review source before selection")
+
+    now = utc_now()
+    for index, row in enumerate(rows):
+        if (
+            index != target_index
+            and row.get("competition_slug") == target.get("competition_slug")
+            and row.get("baseline_role") == "selected"
+        ):
+            rows[index] = {**row, "baseline_role": "superseded", "updated_at": now}
+    rows[target_index] = {
+        **target,
+        "baseline_role": "selected",
+        "status": "selected_baseline",
+        "selection_notes": args.notes,
+        "updated_at": now,
+    }
+    write_json("notebooks.json", rows)
+    emit(rows[target_index], args.json)
 
 
 def validate_notebook_metadata(args: argparse.Namespace) -> None:
@@ -1347,6 +1484,32 @@ def build_parser() -> argparse.ArgumentParser:
     notebook_list.add_argument("--status")
     notebook_list.add_argument("--json", action="store_true")
     notebook_list.set_defaults(func=list_notebooks)
+    notebook_discover = notebooks_sub.add_parser("discover-public")
+    notebook_discover.add_argument("--competition-slug", required=True)
+    notebook_discover.add_argument("--limit", type=int, default=10)
+    notebook_discover.add_argument("--pull-top", type=int, default=0)
+    notebook_discover.add_argument("--output-dir", type=Path)
+    notebook_discover.add_argument(
+        "--sort-by",
+        default="scoreDescending",
+        choices=[
+            "hotness",
+            "commentCount",
+            "dateCreated",
+            "dateRun",
+            "scoreAscending",
+            "scoreDescending",
+            "viewCount",
+            "voteCount",
+        ],
+    )
+    notebook_discover.add_argument("--json", action="store_true")
+    notebook_discover.set_defaults(func=discover_public_notebooks)
+    notebook_select = notebooks_sub.add_parser("select-baseline")
+    notebook_select.add_argument("notebook_id")
+    notebook_select.add_argument("--notes", required=True)
+    notebook_select.add_argument("--json", action="store_true")
+    notebook_select.set_defaults(func=select_baseline_notebook)
     notebook_push = notebooks_sub.add_parser("push")
     notebook_push.add_argument("--path", type=Path, required=True)
     notebook_push.add_argument("--notebook-id")

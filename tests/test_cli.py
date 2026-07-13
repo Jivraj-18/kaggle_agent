@@ -289,6 +289,216 @@ class CliTests(unittest.TestCase):
         rows = json.loads(listing.stdout)
         self.assertEqual(rows[0]["kernel_slug"], "user/demo-kernel")
 
+    def test_discover_public_notebooks_records_ranked_candidates(self):
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+print(json.dumps([
+    {
+        "ref": "expert/high-score-baseline",
+        "title": "High score baseline",
+        "author": "Expert",
+        "lastRunTime": "2026-07-12T10:00:00",
+        "totalVotes": 42
+    },
+    {
+        "ref": "analyst/reproducible-cv",
+        "title": "Reproducible CV",
+        "author": "Analyst",
+        "lastRunTime": "2026-07-11T09:00:00",
+        "totalVotes": 12
+    }
+]))
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+
+        discovered = self.run_cli(
+            "notebooks",
+            "discover-public",
+            "--competition-slug",
+            "demo-comp",
+            "--limit",
+            "2",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+        self.assertEqual(discovered.returncode, 0, discovered.stderr)
+        body = json.loads(discovered.stdout)
+        self.assertEqual(body["sort_by"], "scoreDescending")
+        self.assertEqual([row["kernel_slug"] for row in body["candidates"]], [
+            "expert/high-score-baseline",
+            "analyst/reproducible-cv",
+        ])
+        self.assertEqual(body["candidates"][0]["source"], "kaggle_public")
+        self.assertEqual(body["candidates"][0]["baseline_role"], "candidate")
+
+        stored = json.loads((Path(self.tmp.name) / "notebooks.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(stored), 2)
+        self.assertEqual(stored[0]["notebook_id"], "kaggle-public:expert/high-score-baseline")
+        self.assertEqual(stored[0]["discovery_rank"], 1)
+
+    def test_discover_public_notebooks_can_pull_top_sources(self):
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+if args[:3] == ["kaggle", "kernels", "list"]:
+    print(json.dumps([
+        {"ref": "expert/best-one", "title": "Best one", "author": "Expert", "totalVotes": 20},
+        {"ref": "analyst/second-one", "title": "Second one", "author": "Analyst", "totalVotes": 10}
+    ]))
+elif args[:3] == ["kaggle", "kernels", "pull"]:
+    target = Path(args[args.index("-p") + 1])
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "notebook.ipynb").write_text('{"cells": []}', encoding="utf-8")
+    print(f"Downloaded to {target}")
+else:
+    raise SystemExit(2)
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+        output_dir = Path(self.tmp.name) / "public-sources"
+
+        discovered = self.run_cli(
+            "notebooks",
+            "discover-public",
+            "--competition-slug",
+            "demo-comp",
+            "--limit",
+            "2",
+            "--pull-top",
+            "1",
+            "--output-dir",
+            str(output_dir),
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+        self.assertEqual(discovered.returncode, 0, discovered.stderr)
+        body = json.loads(discovered.stdout)
+        self.assertEqual(len(body["pulls"]), 1)
+        self.assertTrue(body["pulls"][0]["ok"])
+        self.assertEqual(body["pulls"][0]["kernel_slug"], "expert/best-one")
+        self.assertTrue((output_dir / "expert__best-one" / "notebook.ipynb").exists())
+
+        stored = json.loads((Path(self.tmp.name) / "notebooks.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored[0]["status"], "pulled")
+        self.assertEqual(stored[0]["baseline_role"], "candidate")
+        self.assertIsNotNone(stored[0]["source_sha256"])
+        self.assertEqual(stored[1]["status"], "discovered")
+
+    def test_select_baseline_refuses_unpulled_public_notebook(self):
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+print(json.dumps([{"ref": "expert/unreviewed", "title": "Unreviewed", "author": "Expert"}]))
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+        self.run_cli(
+            "notebooks",
+            "discover-public",
+            "--competition-slug",
+            "demo-comp",
+            "--limit",
+            "1",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+
+        selected = self.run_cli(
+            "notebooks",
+            "select-baseline",
+            "kaggle-public:expert/unreviewed",
+            "--notes",
+            "Reviewer found validation acceptable.",
+            "--json",
+        )
+        self.assertEqual(selected.returncode, 1)
+        self.assertIn("pull and review source before selection", selected.stderr)
+
+    def test_select_baseline_records_reviewed_public_notebook(self):
+        bin_dir = Path(self.tmp.name) / "bin"
+        bin_dir.mkdir()
+        fake_uvx = bin_dir / "uvx"
+        fake_uvx.write_text(
+            """#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+if args[:3] == ["kaggle", "kernels", "list"]:
+    print(json.dumps([{"ref": "expert/reviewed", "title": "Reviewed", "author": "Expert"}]))
+elif args[:3] == ["kaggle", "kernels", "pull"]:
+    target = Path(args[args.index("-p") + 1])
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "code.py").write_text("print('baseline')\\n", encoding="utf-8")
+else:
+    raise SystemExit(2)
+""",
+            encoding="utf-8",
+        )
+        fake_uvx.chmod(0o755)
+        self.run_cli(
+            "notebooks",
+            "discover-public",
+            "--competition-slug",
+            "demo-comp",
+            "--limit",
+            "1",
+            "--pull-top",
+            "1",
+            "--output-dir",
+            str(Path(self.tmp.name) / "sources"),
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+
+        selected = self.run_cli(
+            "notebooks",
+            "select-baseline",
+            "kaggle-public:expert/reviewed",
+            "--notes",
+            "Uses official data, correct metric, reproducible CV, and no leakage.",
+            "--json",
+        )
+        self.assertEqual(selected.returncode, 0, selected.stderr)
+        body = json.loads(selected.stdout)
+        self.assertEqual(body["baseline_role"], "selected")
+        self.assertEqual(body["status"], "selected_baseline")
+        self.assertIn("reproducible CV", body["selection_notes"])
+
+        rediscovered = self.run_cli(
+            "notebooks",
+            "discover-public",
+            "--competition-slug",
+            "demo-comp",
+            "--limit",
+            "1",
+            "--json",
+            env_overrides={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        )
+        self.assertEqual(rediscovered.returncode, 0, rediscovered.stderr)
+        refreshed = json.loads(rediscovered.stdout)["candidates"][0]
+        self.assertEqual(refreshed["baseline_role"], "selected")
+        self.assertEqual(refreshed["status"], "selected_baseline")
+
     def test_validate_notebook_metadata_against_profile(self):
         self.run_cli(
             "profiles",

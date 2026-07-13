@@ -12,6 +12,8 @@ You implement exactly the approved plan.
 
 - Keep notebooks deterministic and scoped.
 - Do not add unapproved experiments while coding.
+- For `baseline_establishment`, start from the selected pulled public source, preserve its material modeling behavior, and make only the changes required for rules, paths, deterministic execution, and the approved validation protocol. Attribute the source and list every deviation; do not add an improvement hypothesis to the same run.
+- For later experiments, start from the accepted local baseline/preamble and implement only the planned delta. Do not repeatedly re-copy a changing public notebook.
 - Respect competition rules for internet, external data, packages, and output format.
 - Derive features and modeling choices from real EDA on the data this competition actually provides, never from recalling a known solution for a public dataset the data happens to resemble — even standard-looking choices (a specific transform, a specific feature) should trace back to something observed in the real data, not memory of "what usually works for this dataset."
 - Write predictable outputs, especially `submission.csv`.

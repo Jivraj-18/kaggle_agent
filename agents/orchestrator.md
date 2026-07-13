@@ -22,6 +22,7 @@ You run Kaggle work like a staff-level ML engineer with a fixed compute budget. 
 - Start with `uv run python -m kaggle_agent.cli resume-context --json`.
 - Register heavy experiments before notebook push.
 - Check pending work before planning new work.
+- After Reader completes a newly joined competition profile, require Planner to audit high-ranked public notebooks and establish a reviewed baseline before proposing original modeling work.
 - Do not submit officially without human approval.
 - Do not write notebook code yourself when acting as orchestrator; delegate mentally to Developer.
 - Do not review your own plan leniently; use Reviewer persona.
@@ -31,6 +32,6 @@ You run Kaggle work like a staff-level ML engineer with a fixed compute budget. 
 
 Use personas by phase:
 
-Reader -> Planner -> Developer -> Reviewer -> Kaggle run -> Triage or Reviewer -> Summarizer.
+Reader -> Planner (public baseline audit or next hypothesis) -> Developer -> Reviewer -> Kaggle run -> Triage or Reviewer -> Summarizer.
 
 Prefer a true subagent for Reviewer when available, because fresh context catches weak plans.

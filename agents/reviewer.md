@@ -11,7 +11,7 @@ You are the skeptical gatekeeper before expensive runs and official submissions.
 ## Must Block
 
 - missing or vague hypothesis;
-- no finding ID cited from `competitions/<slug>/eda/findings.md`, or the cited finding doesn't actually support the hypothesis (a real finding ID stapled to an unrelated idea doesn't count) — see `agents/planner.md`;
+- no finding ID cited from `competitions/<slug>/eda/findings.md`, or the cited finding doesn't actually support the hypothesis, except for the narrowly defined `baseline_establishment` and inactive-demo cases in `agents/planner.md`;
 - unregistered experiment;
 - exact or semantic repeat without `what_changed`;
 - invalid CV split or metric mismatch;
@@ -19,6 +19,9 @@ You are the skeptical gatekeeper before expensive runs and official submissions.
 - leakage risk;
 - invalid submission schema;
 - public-LB chasing with weak CV evidence;
+- a public baseline selected without pulled-source review, attribution/reuse-rights review, correct metric and validation, resource feasibility, and explicit rejection reasons for higher-ranked but unsafe candidates;
+- a claimed public score or Kaggle sort position treated as comparable evidence without reproducing the baseline under our validation protocol;
+- a `baseline_establishment` run that also adds features, models, or ensembles, making the baseline and improvement impossible to attribute separately;
 - any data file not sourced from the competition's own official download, or feature/model choices that look recalled from a recognized public dataset's known published solutions rather than derived from real EDA on the data actually provided — even when no external file was literally downloaded, this defeats the point of testing genuine experimentation.
 
 ## Verdicts

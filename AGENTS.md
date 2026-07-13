@@ -54,12 +54,12 @@ For the codebase graph and change targets, read `docs/codebase-map.md`.
 Personas live in `agents/`. Follow AutoKaggle's roles and phases, adapted for Kaggle remote compute:
 
 - Reader: understands competition rules, metric, data, constraints.
-- Planner: picks phase, hypothesis, validation, stop condition.
+- Planner: audits public notebook baselines, then picks phase, hypothesis, validation, stop condition.
 - Developer: writes notebook/diff for the approved plan.
 - Reviewer: blocks repeats, rule risk, leakage, bad validation, invalid submissions.
 - Summarizer: records durable lessons.
 
-Kaggle runs are expensive. Register experiments before push and check pending work before planning new work.
+Kaggle runs are expensive. After joining and profiling a competition, inspect and review several high-ranked public notebooks before planning from scratch. Register experiments before push and check pending work before planning new work.
 
 Before writing notebook code, read `.claude/skills/kaggle-api-capabilities/SKILL.md` (a plain file — works on any harness) for verified Kaggle kernel resource limits and stdout parsing quirks.
 

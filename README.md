@@ -9,8 +9,9 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 1. Read local state from `state/`.
 2. Query Kaggle only for pending or explicitly requested items.
 3. Pull outputs/logs only when a run is terminal or state changed.
-4. Feed raw Kaggle context and local history to the coding agent for decisions.
-5. Use Kaggle as remote compute, not as the source of long-term agent memory.
+4. After joining, audit high-ranked public notebooks and reproduce the strongest compliant baseline before inventing new modeling work.
+5. Feed raw Kaggle context and local history to the coding agent for decisions.
+6. Use Kaggle as remote compute, not as the source of long-term agent memory.
 
 ## Main commands
 
@@ -21,7 +22,7 @@ The v0 workflow is user-triggered: the user asks the coding agent to scout compe
 - `kaggle-agent validate-state`: validate state file shapes.
 - `kaggle-agent competitions add/list`: record competitions under consideration or joined.
 - `kaggle-agent profiles add/list`: record Reader-extracted competition facts, including `--team-name` for leaderboard lookups.
-- `kaggle-agent notebooks add/list/push`: record notebook references without committing notebook files, and push approved notebooks to Kaggle.
+- `kaggle-agent notebooks add/list/discover-public/select-baseline/push`: discover and review public baselines, record notebook references without committing notebook files, and push approved notebooks to Kaggle.
 - `kaggle-agent notebooks validate-metadata`: check Kaggle metadata before push.
 - `kaggle-agent tasks add/list/complete`: record cross-session next actions.
 - `kaggle-agent runs add/list/check/pull-output/review-output`: record Kaggle notebook runs, check one run on demand, and review outputs.
@@ -166,6 +167,18 @@ uv run python -m kaggle_agent.cli submissions refresh \
 ```
 
 All list/summary commands support `--json` for agent-friendly parsing.
+
+Discover and pull a few high-ranked public notebooks before planning a new baseline:
+
+```bash
+uv run python -m kaggle_agent.cli notebooks discover-public \
+  --competition-slug <slug> \
+  --limit 10 \
+  --pull-top 5 \
+  --json
+```
+
+This uses Kaggle's `scoreDescending` ordering by default and records raw candidate metadata in `state/notebooks.json`. Ranking and notebook titles are not approval: inspect pulled sources for rules, data provenance, validation, leakage, runtime, and reuse rights before recording a selection with `notebooks select-baseline`.
 
 `resume-context --json` includes `competition_status`, a per-competition rollup of pending runs, pending experiments, open tasks, and next action labels.
 

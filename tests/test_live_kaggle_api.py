@@ -27,12 +27,14 @@ from kaggle_agent.kaggle_cli import (
     competition_submissions,
     kernel_status,
     list_competitions,
+    list_public_kernels,
     parse_json_output,
 )
 
 LIVE = os.environ.get("KAGGLE_AGENT_LIVE_TESTS") == "1"
 COMPETITION_SLUG = "heavy-equipment-selling-price-prediction-challenge"
 KNOWN_KERNEL_SLUG = "jivrajsingh/22f3002542-notebook-2026t2"
+PUBLIC_NOTEBOOK_COMPETITION = "autonomous-agent-prediction-beta"
 
 
 @unittest.skipUnless(LIVE, "set KAGGLE_AGENT_LIVE_TESTS=1 to run live Kaggle API smoke tests")
@@ -67,6 +69,17 @@ class LiveKaggleApiTests(unittest.TestCase):
         # raw wrapper still returns the prefixed form so that strip doesn't
         # silently become a no-op if Kaggle changes the status string format.
         self.assertTrue(status.startswith("KernelWorkerStatus."))
+
+    def test_public_notebook_discovery_has_reviewable_source_fields(self):
+        rows, result = list_public_kernels(
+            PUBLIC_NOTEBOOK_COMPETITION,
+            page_size=5,
+            sort_by="scoreDescending",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreater(len(rows), 0)
+        for key in ("ref", "title", "author"):
+            self.assertIn(key, rows[0])
 
 
 if __name__ == "__main__":
